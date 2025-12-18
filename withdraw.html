@@ -98,115 +98,256 @@
   <!-- Wallet helpers -->
   <script src="wallet.js"></script>
   <script>
-    (function() {{
-      var qtyInput = document.getElementById('qtyInput');
-      var feeVal = document.getElementById('feeVal');
-      var recvVal = document.getElementById('recvVal');
-      var minQty = 20;
-      var maxAvailable = 0;
-      var maxLink = document.getElementById('maxLink');
-      var withdrawBtn = document.getElementById('withdrawBtn');
-      var availableVal = document.getElementById('availableVal');
+(function () {
+  'use strict';
 
-      var balance = 0;
+  var qtyInput = document.getElementById('qtyInput');
+  var feeVal = document.getElementById('feeVal');
+  var recvVal = document.getElementById('recvVal');
+  var maxLink = document.getElementById('maxLink');
+  var withdrawBtn = document.getElementById('withdrawBtn');
+  var availableVal = document.getElementById('availableVal');
+  var reminderMin = document.getElementById('reminderMin');
 
-      if (window.DemoWallet && typeof window.DemoWallet.getWallet === 'function') {
-        var w = DemoWallet.getWallet();
-        if (w && typeof w.balance === 'number') {
-          balance = w.balance;
-        }
+  var currencyValue = document.getElementById('currencyValue');
+  var currencyMenu = document.getElementById('currencyMenu');
+  var networkRow = document.getElementById('networkRow');
+  var addressInput = document.getElementById('addressInput');
+
+  var currentCurrency = (currencyValue && currencyValue.textContent || 'USDT').trim().toUpperCase();
+  var currentNetwork = 'TRC20';
+  var minQty = 20;
+  var maxAvailable = 0;
+
+  function sbHeaders() {
+    var SB = window.SB_CONFIG;
+    if (!SB || !SB.url || !SB.anonKey) throw new Error('SB_CONFIG missing');
+    return {
+      'apikey': SB.anonKey,
+      'Authorization': 'Bearer ' + SB.anonKey,
+      'Content-Type': 'application/json'
+    };
+  }
+
+  async function sbGet(path) {
+    var SB = window.SB_CONFIG;
+    var res = await fetch(SB.url + '/rest/v1/' + path, { headers: sbHeaders() });
+    var body = await res.text();
+    if (!res.ok) throw new Error(body || ('HTTP ' + res.status));
+    return body ? JSON.parse(body) : null;
+  }
+
+  async function sbRpc(fn, payload) {
+    var SB = window.SB_CONFIG;
+    var res = await fetch(SB.url + '/rest/v1/rpc/' + fn, {
+      method: 'POST',
+      headers: sbHeaders(),
+      body: JSON.stringify(payload || {})
+    });
+    var body = await res.text();
+    if (!res.ok) {
+      // Supabase returns JSON with message sometimes
+      try {
+        var j = JSON.parse(body);
+        throw new Error(j.message || body);
+      } catch (_) {
+        throw new Error(body || ('HTTP ' + res.status));
       }
+    }
+    return body ? JSON.parse(body) : null;
+  }
 
-      maxAvailable = balance;
-      if (availableVal) {
-        availableVal.textContent = balance.toFixed(2) + ' USDT';
+  async function getUserId() {
+    if (window.ExaAuth && typeof window.ExaAuth.ensureSupabaseUserId === 'function') {
+      var id = await window.ExaAuth.ensureSupabaseUserId();
+      if (id) return id;
+    }
+    // fallback: read localStorage
+    return localStorage.getItem('sb_user_id_v1') || localStorage.getItem('currentUserId');
+  }
+
+  function updateValues() {
+    var v = parseFloat(qtyInput && qtyInput.value || '0');
+    if (!isFinite(v) || v <= 0) {
+      if (feeVal) feeVal.textContent = '0';
+      if (recvVal) recvVal.textContent = '0';
+      return;
+    }
+    var fee = v * 0.05;
+    var received = v - fee;
+    if (feeVal) feeVal.textContent = fee.toFixed(2);
+    if (recvVal) recvVal.textContent = received.toFixed(2);
+  }
+
+  function setNetworkButtons() {
+    if (!networkRow) return;
+    var btns = networkRow.querySelectorAll('[data-network]');
+    btns.forEach(function (b) {
+      var net = (b.getAttribute('data-network') || '').toUpperCase();
+      var allowed = true;
+      if (currentCurrency === 'USDT') {
+        allowed = (net === 'TRC20'); // matches DB rules
+      } else if (currentCurrency === 'USDC') {
+        allowed = (net === 'BEP20' || net === 'ERC20');
       }
-
-      function updateValues() {{
-        var v = parseFloat(qtyInput.value);
-        if (isNaN(v) || v <= 0) {{
-          feeVal.textContent = '0';
-          recvVal.textContent = '0';
-          return;
-        }}
-        var fee = v * 0.05;
-        var received = v - fee;
-        feeVal.textContent = fee.toFixed(2);
-        recvVal.textContent = received.toFixed(2);
-      }}
-
-      if (qtyInput) {{
-        qtyInput.addEventListener('input', updateValues);
-      }}
-
-      if (maxLink) {{
-        maxLink.addEventListener('click', function() {{
-          qtyInput.value = maxAvailable.toFixed(2);
-          updateValues();
-        }});
-      }}
-
-      if (withdrawBtn) {
-        withdrawBtn.addEventListener('click', function() {
-          if (window.__withdraw_blocked__) { return; }
-
-          if (!window.DemoWallet || typeof window.DemoWallet.getWallet !== 'function' || typeof window.DemoWallet.withdraw !== 'function') {
-            alert('Internal error: wallet not available.');
-            return;
-          }
-
-          var v = parseFloat(qtyInput.value);
-          if (isNaN(v) || v <= 0) {
-            alert('Please enter a valid amount.');
-            return;
-          }
-
-          if (v < minQty) {
-            alert('The minimum withdrawal amount is ' + minQty + ' USDT.');
-            return;
-          }
-
-          if (v > balance) {
-            alert('Insufficient balance.');
-            return;
-          }
-
-          var wCheck = DemoWallet.getWallet();
-          if (!wCheck || typeof wCheck.totalIncome !== 'number' || wCheck.totalIncome < 6) {
-            alert('You can apply for withdrawal only after completing 6 AI computing power tasks.');
-            return;
-          }
-
-          var fee = v * 0.05;
-          var received = v - fee;
-
-          var result = DemoWallet.withdraw(v);
-          if (!result) {
-            alert('Withdrawal failed, please try again.');
-            return;
-          }
-
-          balance = result.balance || 0;
-          maxAvailable = balance;
-          if (availableVal) {
-            availableVal.textContent = balance.toFixed(2) + ' USDT';
-          }
-
-          if (qtyInput) {
-            qtyInput.value = '';
-          }
-          updateValues();
-
-          var addr = window.__withdraw_selected_address__ || '';
-          if (addr) {
-            alert('Withdrawal request submitted and is pending review.\nAddress: ' + addr);
-          } else {
-            alert('Withdrawal request submitted and is pending review.');
-          }
-        });
+      b.disabled = !allowed;
+      b.classList.toggle('active', allowed && net === currentNetwork);
+      b.classList.toggle('disabled', !allowed);
+      if (!allowed && net === currentNetwork) {
+        currentNetwork = (currentCurrency === 'USDT') ? 'TRC20' : 'BEP20';
       }
-    }})();
-  </script>
+    });
+  }
+
+  function syncReminder() {
+    if (reminderMin) reminderMin.textContent = minQty + ' ' + currentCurrency;
+  }
+
+  async function refreshBalance() {
+    var userId = await getUserId();
+    if (!userId) return;
+
+    // wallet balance (demo balance)
+    var rows = await sbGet('wallet_balances?select=usdt_balance,usdt_reserved&user_id=eq.' + encodeURIComponent(userId) + '&limit=1');
+    var bal = 0;
+    if (Array.isArray(rows) && rows[0]) bal = parseFloat(rows[0].usdt_balance || 0) || 0;
+
+    maxAvailable = bal;
+    if (availableVal) availableVal.textContent = bal.toFixed(2) + ' ' + currentCurrency;
+  }
+
+  async function prefillAddressFromDb() {
+    try {
+      var userId = await getUserId();
+      if (!userId) return;
+
+      // DB stores lower-case currency/network
+      var cur = currentCurrency.toLowerCase();
+      var net = currentNetwork.toLowerCase();
+
+      var rows = await sbGet(
+        'user_payout_addresses?select=address&user_id=eq.' + encodeURIComponent(userId) +
+        '&currency=eq.' + encodeURIComponent(cur) +
+        '&network=eq.' + encodeURIComponent(net) +
+        '&limit=1'
+      );
+      if (Array.isArray(rows) && rows[0] && rows[0].address && addressInput && !addressInput.value) {
+        addressInput.value = rows[0].address;
+      }
+    } catch (e) {
+      // ignore - user may not have an address yet
+    }
+  }
+
+  async function doWithdraw() {
+    var userId = await getUserId();
+    if (!userId) {
+      alert('Please login again.');
+      return;
+    }
+
+    var amount = parseFloat(qtyInput && qtyInput.value || '0');
+    if (!isFinite(amount) || amount <= 0) {
+      alert('Enter a valid amount.');
+      return;
+    }
+    if (amount < minQty) {
+      alert('Minimum withdrawal is ' + minQty + ' ' + currentCurrency + '.');
+      return;
+    }
+    if (amount > maxAvailable + 1e-9) {
+      alert('Insufficient balance.');
+      return;
+    }
+
+    var addr = (addressInput && addressInput.value || '').trim();
+    if (addr.length < 5) {
+      alert('Enter a valid address.');
+      return;
+    }
+
+    withdrawBtn && (withdrawBtn.disabled = true);
+
+    try {
+      // request_withdrawal expects lowercase currency/network
+      var reqId = await sbRpc('request_withdrawal', {
+        p_user: userId,
+        p_amount: amount,
+        p_currency: currentCurrency.toLowerCase(),
+        p_network: currentNetwork.toLowerCase(),
+        p_address: addr
+      });
+
+      // success: refresh balance and show message
+      await refreshBalance();
+      alert('Withdrawal request submitted. Request ID: ' + reqId);
+      if (qtyInput) qtyInput.value = '';
+      updateValues();
+    } catch (e) {
+      alert((e && e.message) ? e.message : String(e));
+    } finally {
+      withdrawBtn && (withdrawBtn.disabled = false);
+    }
+  }
+
+  function wireUi() {
+    if (qtyInput) qtyInput.addEventListener('input', updateValues);
+    if (maxLink) {
+      maxLink.addEventListener('click', function (e) {
+        e.preventDefault();
+        if (qtyInput) qtyInput.value = (maxAvailable || 0).toFixed(2);
+        updateValues();
+      });
+    }
+    if (withdrawBtn) withdrawBtn.addEventListener('click', doWithdraw);
+
+    // currency dropdown
+    if (currencyMenu) {
+      currencyMenu.addEventListener('click', function (e) {
+        var t = e.target;
+        if (!t || !t.getAttribute) return;
+        var c = t.getAttribute('data-currency');
+        if (!c) return;
+        currentCurrency = c.toUpperCase();
+        if (currencyValue) currencyValue.textContent = currentCurrency;
+
+        // update network defaults
+        currentNetwork = (currentCurrency === 'USDT') ? 'TRC20' : 'BEP20';
+        setNetworkButtons();
+        syncReminder();
+        refreshBalance();
+        prefillAddressFromDb();
+      });
+    }
+
+    // network buttons
+    if (networkRow) {
+      networkRow.addEventListener('click', function (e) {
+        var b = e.target && e.target.closest ? e.target.closest('[data-network]') : null;
+        if (!b || b.disabled) return;
+        currentNetwork = (b.getAttribute('data-network') || 'TRC20').toUpperCase();
+        setNetworkButtons();
+        prefillAddressFromDb();
+      });
+    }
+  }
+
+  async function init() {
+    try {
+      syncReminder();
+      setNetworkButtons();
+      wireUi();
+      await refreshBalance();
+      await prefillAddressFromDb();
+      updateValues();
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  init();
+})();
+</script>
 
 
   <!-- Authentication helpers -->
