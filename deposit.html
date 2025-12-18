@@ -381,264 +381,333 @@
 </div>
 
   <script src="sb-config.js"></script>
-<script src="sb-user.js"></script>
 <script src="auth.js"></script>
 <script src="common-nav.js"></script>
 
 
 <script>
-(function () {
-  var SUPABASE_URL = (window.SB_CONFIG && window.SB_CONFIG.url) ? window.SB_CONFIG.url : "";
-  var SUPABASE_ANON_KEY = (window.SB_CONFIG && window.SB_CONFIG.anonKey) ? window.SB_CONFIG.anonKey : "";
+  (function() {
+    var SUPABASE_URL = (window.SB_CONFIG && window.SB_CONFIG.url) ? window.SB_CONFIG.url : "";
+    var SUPABASE_ANON_KEY = (window.SB_CONFIG && window.SB_CONFIG.anonKey) ? window.SB_CONFIG.anonKey : "";
+    var EDGE_FUNCTION = (window.DEPOSIT_EDGE_FUNCTION || "generate-deposit-address");
 
-  var EDGE_FUNCTION = "nowpayments-create-payment"; // Edge Functions > Functions > name
-  var DEFAULT_AMOUNT = 100;
+    var networkConfigs = {
+      "BEP20": { address: "" },
+      "TRC20": { address: "" },
+      "ERC20": { address: "" }
+    };
+    window.depositNetworkConfigs = networkConfigs;
 
-  var networkButtons = Array.prototype.slice.call(document.querySelectorAll(".network-btn"));
-  var addressTextEl = document.querySelector(".address-text");
-  var qrImgEl = document.getElementById("depositQr");
-  var copyBtn = document.querySelector(".copy-btn");
+    var currentCurrency = "USDT";
+    var qrImgEl = document.getElementById("depositQr");
+    var addressTextEl = document.querySelector(".address-text");
+    var qrCaptionEl = document.querySelector(".qr-caption");
+    var networkButtons = Array.prototype.slice.call(document.querySelectorAll(".network-btn") || []);
+    var copyBtn = document.querySelector(".copy-btn");
 
-  function setAddress(addr) {
-    if (addressTextEl) addressTextEl.textContent = addr || "";
-  }
-
-  function setQr(addr) {
-    if (!qrImgEl) return;
-    if (!addr) { qrImgEl.removeAttribute("src"); return; }
-    qrImgEl.src = "https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=" + encodeURIComponent(addr);
-  }
-
-  function setActive(btn) {
-    networkButtons.forEach(function (b) { b.classList.remove("active"); });
-    if (btn) btn.classList.add("active");
-  }
-
-  function currentNetwork() {
-    var active = document.querySelector(".network-btn.active");
-    var t = active ? (active.textContent || "").trim().toUpperCase() : "BEP20";
-    if (t === "TRC20") return "trc20";
-    if (t === "ERC20") return "erc20";
-    return "bep20";
-  }
-
-  async function getAccessToken() {
-    // Uses your existing sb-user.js helper (same pattern as other pages)
-    if (window.SB_USER && typeof window.SB_USER.getSessionSafe === "function") {
-      var s = await window.SB_USER.getSessionSafe();
-      return s && s.access_token ? s.access_token : null;
+    function placeholderQrDataUri() {
+      var svg = ""
+        + "<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220' viewBox='0 0 220 220'>"
+        + "<rect width='220' height='220' fill='#fff'/>"
+        + "<rect x='10' y='10' width='200' height='200' rx='12' fill='none' stroke='#d9d9d9' stroke-width='2'/>"
+        + "<circle cx='110' cy='110' r='26' fill='#fff' stroke='#111' stroke-width='6'/>"
+        + "<circle cx='110' cy='110' r='10' fill='#111'/>"
+        + "</svg>";
+      return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
     }
-    // Fallback: try Supabase client from auth.js if available
-    if (window.ExaAuth && window.ExaAuth.ensureSupabaseUserId) {
-      // ensure user exists; but auth.js does not expose token, so return null
-      try { await window.ExaAuth.ensureSupabaseUserId(); } catch (e) {}
-    }
-    return null;
-  }
 
-  async function fetchDepositAddress() {
-    try {
-      setAddress("Loading...");
-      setQr("");
-
-      var token = await getAccessToken();
-      if (!token) {
-        setAddress("Please login first");
+    function updateQr(address) {
+      if (!qrImgEl) return;
+      var data = address ? String(address).trim() : "";
+      if (!data) {
+        qrImgEl.src = placeholderQrDataUri();
         return;
       }
+      var url = "https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=" + encodeURIComponent(data);
+      qrImgEl.src = url;
+    }
+
+    function setActiveNetwork(network) {
+      networkButtons.forEach(function(b) {
+        var t = (b.textContent || "").trim().toUpperCase();
+        if (t === network) b.classList.add("active");
+        else b.classList.remove("active");
+      });
+      updateAddress(network);
+    }
+
+    function updateAddress(network) {
+      var cfg = networkConfigs[network];
+      if (!cfg || !addressTextEl || !qrCaptionEl) return;
+
+      var addr = (cfg.address || "").trim();
+      if (!addr) {
+        addressTextEl.textContent = "Loading...";
+        updateQr("");
+        if (network === "BEP20") {
+          qrCaptionEl.textContent = "Fetching " + network + " " + currentCurrency + " address...";
+        } else {
+          qrCaptionEl.textContent = "This network is not available yet.";
+        }
+        return;
+      }
+
+      addressTextEl.textContent = addr;
+      updateQr(addr);
+      qrCaptionEl.textContent = "This address only supports deposits of " + network + " " + currentCurrency;
+    }
+
+    async function getCurrentSupabaseUserId() {
+      try {
+        if (window.ExaAuth && typeof window.ExaAuth.ensureSupabaseUserId === "function") {
+          var id = await window.ExaAuth.ensureSupabaseUserId();
+          return id ? String(id) : "";
+        }
+      } catch (e) {}
+      return "";
+    }
+
+    async function fetchDepositAddresses() {
+      if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+        return;
+      }
+      var userId = await getCurrentSupabaseUserId();
+      if (!userId) return;
 
       var fnUrl = String(SUPABASE_URL).replace(/\/$/, "") + "/functions/v1/" + EDGE_FUNCTION;
 
       var payload = {
-        network: currentNetwork(),
-        amount: DEFAULT_AMOUNT
+        user_id: userId,
+        currency: currentCurrency,
+        networks: ["BEP20", "TRC20", "ERC20"]
       };
 
-      var r = await fetch(fnUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "apikey": SUPABASE_ANON_KEY,
-          "Authorization": "Bearer " + token
-        },
-        body: JSON.stringify(payload)
-      });
+      try {
+        var r = await fetch(fnUrl, {
+          method: "POST",
+          headers: {
+            "apikey": SUPABASE_ANON_KEY,
+            "Authorization": "Bearer " + SUPABASE_ANON_KEY,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(payload)
+        });
 
-      var data = await r.json().catch(function () { return {}; });
+        var data = null;
+        try { data = await r.json(); } catch (e) { data = null; }
 
-      if (!r.ok) {
-        console.error("Edge function error:", data);
-        setAddress("Failed to fetch address");
-        return;
+        if (!data) return;
+
+        var addrs = data.addresses || null;
+        if (!addrs && data.network && data.address) {
+          addrs = {};
+          addrs[String(data.network).toUpperCase()] = String(data.address);
+        }
+
+        if (addrs && typeof addrs === "object") {
+          Object.keys(addrs).forEach(function(k) {
+            var key = String(k).toUpperCase();
+            if (networkConfigs[key]) {
+              networkConfigs[key].address = String(addrs[k] || "");
+            }
+          });
+        }
+      } catch (e) {
+        // keep placeholder; avoid breaking UI
+        if (qrCaptionEl) qrCaptionEl.textContent = "Unable to fetch deposit address.";
       }
-
-      setAddress(data.address || "");
-      setQr(data.address || "");
-    } catch (e) {
-      console.error(e);
-      setAddress("Failed to fetch address");
     }
-  }
 
-  // Copy
-  if (copyBtn) {
-    copyBtn.addEventListener("click", function () {
-      var txt = addressTextEl ? addressTextEl.textContent : "";
-      if (!txt) return;
-      navigator.clipboard.writeText(txt).catch(function () {});
+    if (copyBtn) {
+      copyBtn.addEventListener("click", function() {
+        var v = addressTextEl ? String(addressTextEl.textContent || "").trim() : "";
+        if (!v || v.toLowerCase() === "loading..." || v.toLowerCase() === "loading.") return;
+        if (navigator && navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(v).catch(function() {});
+        } else {
+          try {
+            var ta = document.createElement("textarea");
+            ta.value = v;
+            ta.style.position = "fixed";
+            ta.style.left = "-9999px";
+            document.body.appendChild(ta);
+            ta.focus();
+            ta.select();
+            document.execCommand("copy");
+            document.body.removeChild(ta);
+          } catch (e) {}
+        }
+      });
+    }
+
+    // Wire network buttons
+    networkButtons.forEach(function(btn) {
+      btn.addEventListener("click", function() {
+        var network = (btn.textContent || "").trim().toUpperCase();
+        if (!networkConfigs[network]) return;
+        setActiveNetwork(network);
+      });
     });
-  }
 
-  // Bind buttons
-  networkButtons.forEach(function (btn) {
-    btn.addEventListener("click", function () {
-      setActive(btn);
-      // For now you said only BEP20 is ready; still let UI switch without breaking
-      fetchDepositAddress();
+    // Init
+    updateQr("");
+    setActiveNetwork("BEP20");
+    fetchDepositAddresses().then(function() {
+      // refresh current view after load
+      var active = "BEP20";
+      networkButtons.forEach(function(b) {
+        if (b.classList.contains("active")) active = (b.textContent || "BEP20").trim().toUpperCase();
+      });
+      updateAddress(active);
     });
-  });
-
-  // initial load
-  if (networkButtons.length) setActive(networkButtons[0]);
-  fetchDepositAddress();
-})();
+  })();
 </script>
 
 
 <script>
-  (function () {
-    if (!window.DemoWallet) return;
+(function () {
+  const SB_URL = (window.SB_URL || (window.SB && window.SB.url)) || "";
+  const SB_ANON_KEY = (window.SB_ANON_KEY || (window.SB && window.SB.anonKey)) || "";
 
-    var POLL_INTERVAL_MS = 20000; // 20 seconds
-    var lastSeenKey = null;
-    var timerId = null;
+  const networks = [
+    { key: "bep20", label: "BEP20" },
+    { key: "trc20", label: "TRC20" },
+    { key: "erc20", label: "ERC20" },
+  ];
 
-    function getCurrentCurrency() {
-      var currencyEl = document.querySelector(".currency-text");
-      return (currencyEl && currencyEl.textContent ? currencyEl.textContent.trim() : "USDT");
+  function el(id) { return document.getElementById(id); }
+
+  function setStatus(text) {
+    const statusEl = document.querySelector(".qrcode-tip, #depositStatus, .deposit-status");
+    if (statusEl) statusEl.textContent = text;
+  }
+
+  function setAddress(text) {
+    const addrEl =
+      el("depositAddress") ||
+      document.querySelector("[data-deposit-address]") ||
+      document.querySelector(".deposit-address") ||
+      document.querySelector("#addressText");
+    if (addrEl) addrEl.textContent = text;
+  }
+
+  function setQr(dataUrl) {
+    const img =
+      el("depositQr") ||
+      document.querySelector("img.qrcode") ||
+      document.querySelector("#qrcodeImg") ||
+      document.querySelector("img[alt*='QR'], img[alt*='Qr'], img[alt*='qr']");
+    if (img) img.src = dataUrl;
+  }
+
+  function setActiveNetworkUI(netKey) {
+    const btns = document.querySelectorAll("[data-network]");
+    btns.forEach(b => b.classList.toggle("active", (b.getAttribute("data-network") || "").toLowerCase() === netKey));
+  }
+
+  async function ensureLoggedInUserId() {
+    if (!window.ExaAuth || typeof window.ExaAuth.ensureSupabaseUserId !== "function") {
+      return null;
     }
-
-    function getBep20Address() {
-      if (!window.depositNetworkConfigs || !window.depositNetworkConfigs.BEP20) return null;
-      return window.depositNetworkConfigs.BEP20.address || null;
+    try {
+      const id = await window.ExaAuth.ensureSupabaseUserId();
+      return id || null;
+    } catch (e) {
+      console.error(e);
+      return null;
     }
+  }
 
-    function getLastSeenHashKey(address) {
-      return "last_seen_bep20_tx_" + address.toLowerCase();
-    }
+  async function fetchDepositAddress(userId, netKey) {
+    if (!SB_URL || !SB_ANON_KEY) throw new Error("Missing Supabase config");
+    const url = new URL(SB_URL.replace(/\/+$/, "") + "/rest/v1/user_payout_addresses");
+    url.searchParams.set("select", "address,network,currency,created_at");
+    url.searchParams.set("user_id", "eq." + userId);
+    url.searchParams.set("currency", "eq.usdt");
+    url.searchParams.set("network", "eq." + netKey);
+    url.searchParams.set("order", "created_at.desc");
+    url.searchParams.set("limit", "1");
 
-    function readLastSeenHash(address) {
-      try {
-        var k = getLastSeenHashKey(address);
-        return window.localStorage.getItem(k);
-      } catch (e) {
-        return null;
+    const res = await fetch(url.toString(), {
+      method: "GET",
+      headers: {
+        "apikey": SB_ANON_KEY,
+        "Authorization": "Bearer " + SB_ANON_KEY,
+        "Accept": "application/json",
       }
+    });
+    if (!res.ok) {
+      const t = await res.text().catch(() => "");
+      throw new Error("REST error " + res.status + " " + t);
     }
+    const rows = await res.json();
+    return rows && rows[0] && rows[0].address ? rows[0].address : null;
+  }
 
-    function writeLastSeenHash(address, hash) {
-      try {
-        var k = getLastSeenHashKey(address);
-        window.localStorage.setItem(k, hash);
-      } catch (e) {}
-    }
+  async function renderForNetwork(userId, netKey) {
+    setActiveNetworkUI(netKey);
+    setStatus("Loading...");
+    setAddress("Loading...");
 
-    function pollBep20Deposits() {
-      if (typeof BSC_SCAN_API_KEY === "undefined" || !BSC_SCAN_API_KEY || BSC_SCAN_API_KEY === "PUT_YOUR_BSCSCAN_API_KEY_HERE") {
+    try {
+      const address = await fetchDepositAddress(userId, netKey);
+      if (!address) {
+        setStatus("No address assigned for " + netKey.toUpperCase());
+        setAddress("-");
+        setQr("");
         return;
       }
-      var addr = getBep20Address();
-      if (!addr) return;
-      var addrLower = addr.toLowerCase();
 
-      var url = "https://api.bscscan.com/api"
-        + "?module=account&action=tokentx"
-        + "&sort=desc"
-        + "&address=" + encodeURIComponent(addrLower)
-        + "&apikey=" + encodeURIComponent(BSC_SCAN_API_KEY);
+      setStatus("This address only supports deposits of " + netKey.toUpperCase() + " USDT");
+      setAddress(address);
 
-      fetch(url)
-        .then(function (r) { return r.json(); })
-        .then(function (data) {
-          if (!data || data.status !== "1" || !data.result || !data.result.length) {
-            return;
-          }
-          var tx = data.result[0];
-          if (!tx.to) return;
-          if (tx.to.toLowerCase() !== addrLower) return;
-
-          var lastSeen = readLastSeenHash(addrLower);
-          if (!lastSeen) {
-            // أول مرة نرى هذا العنوان، نخزن آخر معاملة ولا نضيف رصيد
-            writeLastSeenHash(addrLower, tx.hash);
-            return;
-          }
-          if (lastSeen === tx.hash) {
-            // لا يوجد إيداع جديد
-            return;
-          }
-
-          // معاملة جديدة: نحسب المبلغ ونحدث الرصيد
-          writeLastSeenHash(addrLower, tx.hash);
-
-          var decimals = parseInt(tx.tokenDecimal || "18", 10);
-          var raw = tx.value || "0";
-          var amount = 0;
-          try {
-            var len = raw.length;
-            if (decimals >= len) {
-              var s = "0." + "0".repeat(decimals - len) + raw;
-              amount = parseFloat(s);
-            } else {
-              var intPart = raw.slice(0, len - decimals);
-              var fracPart = raw.slice(len - decimals);
-              var s2 = intPart + "." + fracPart;
-              amount = parseFloat(s2);
-            }
-          } catch (e) {
-            return;
-          }
-          if (!amount || !isFinite(amount) || amount <= 0) return;
-
-          var currency = getCurrentCurrency() || "USDT";
-
-          try {
-            // نضيف الرصيد محلياً في المحفظة
-            window.DemoWallet.recordDeposit(amount, currency);
-          } catch (e) {
-            if (console && console.error) console.error("recordDeposit error", e);
-          }
-
-          try {
-            // نسجل الإيداع أيضاً في Supabase باستخدام tx.hash
-            if (window.DemoWallet.submitDepositTx) {
-              window.DemoWallet.submitDepositTx(tx.hash, "BEP20", currency);
-            }
-          } catch (e) {
-            if (console && console.error) console.error("submitDepositTx error", e);
-          }
-
-          try {
-            alert("New BEP20 deposit detected: +" + amount + " " + currency);
-          } catch (e) {}
-        })
-        .catch(function (err) {
-          if (typeof console !== "undefined" && console && console.error) {
-            console.error("BEP20 auto poll error", err);
-          }
-        });
+      if (window.QRCode && typeof window.QRCode.toDataURL === "function") {
+        const dataUrl = await window.QRCode.toDataURL(address, { width: 220, margin: 1 });
+        setQr(dataUrl);
+      } else if (window.QRCode && typeof window.QRCode.toCanvas === "function") {
+        // fallback: leave as-is
+      }
+    } catch (e) {
+      console.error(e);
+      setStatus("Failed to load address");
+      setAddress("-");
+      setQr("");
     }
+  }
 
-    function startPolling() {
-      if (timerId) return;
-      timerId = window.setInterval(pollBep20Deposits, POLL_INTERVAL_MS);
-      // أول مرة بعد ثانيتين
-      window.setTimeout(pollBep20Deposits, 2000);
+  function wireNetworkButtons(userId) {
+    // If HTML already has buttons, make them emit data-network
+    const byText = (txt) => Array.from(document.querySelectorAll("button, .network-btn, .tab-btn, .deposit-network-item"))
+      .find(b => (b.textContent || "").trim().toUpperCase() === txt);
+
+    // Set data-network on known buttons if missing
+    networks.forEach(n => {
+      const btn = document.querySelector("[data-network='" + n.key + "']") || byText(n.label);
+      if (btn && !btn.getAttribute("data-network")) btn.setAttribute("data-network", n.key);
+    });
+
+    document.querySelectorAll("[data-network]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const netKey = (btn.getAttribute("data-network") || "").toLowerCase();
+        if (!netKey) return;
+        renderForNetwork(userId, netKey);
+      });
+    });
+  }
+
+  (async function init() {
+    const userId = await ensureLoggedInUserId();
+    if (!userId) {
+      setStatus("Please login first");
+      setAddress("Please login first");
+      setQr("");
+      return;
     }
-
-    // نبدأ المراقبة تلقائياً عندما يفتح المستخدم صفحة الإيداع
-    startPolling();
+    wireNetworkButtons(userId);
+    await renderForNetwork(userId, "bep20");
   })();
+})();
 </script>
+
 </body>
 </html>
