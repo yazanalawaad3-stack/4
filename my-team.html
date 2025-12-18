@@ -575,15 +575,7 @@
 
   <script>
     (function () {
-      function apiHeaders() {
-        return {
-          "apikey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im95b3dzamptYWVzc3BxaWtudmhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU4MTE4NzcsImV4cCI6MjA4MTM4Nzg3N30.aBo32xNG_dh1QD7NBI4N6jhYFLY42Xyxer2DNXxJi-w",
-          "Authorization": "Bearer " + "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im95b3dzamptYWVzc3BxaWtudmhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU4MTE4NzcsImV4cCI6MjA4MTM4Nzg3N30.aBo32xNG_dh1QD7NBI4N6jhYFLY42Xyxer2DNXxJi-w",
-          "Content-Type": "application/json",
-          "Accept": "application/json"
-        };
-      }
-
+      
       function fmtDate(ts) {
         if (!ts) return "-";
         try {
@@ -612,20 +604,19 @@
 
       async function fetchUsersByInviterIds(inviterIds) {
         if (!inviterIds || !inviterIds.length) return [];
-        var url = "https://oyowsjjmaesspqiknvhp.supabase.co" + "/rest/v1/users"
+        var url = SB_CONFIG.url + "/rest/v1/users"
           + "?select=id,phone,created_at,inviter_id"
           + "&inviter_id=" + inFilter(inviterIds)
           + "&order=created_at.desc"
           + "&limit=1000";
-        var res = await fetch(url, { method: "GET", headers: apiHeaders() });
+        var res = await fetch(url, { method: "GET", headers: SB_CONFIG.headers() });
         if (!res.ok) return [];
         var rows = await res.json();
         return Array.isArray(rows) ? rows : [];
       }
 
 
-      // --- Funded/effective helpers (real deposits) ---
-      var FUNDED_MIN_USDT = 100; // funded threshold in USDT (change only if your business rule changes)
+      // --- Funded/effective helpers (funded_at in user_state via RPC) ---
 
       function uniq(arr) {
         var seen = Object.create(null);
@@ -639,34 +630,53 @@
         return out;
       }
 
-      async function fetchDepositTotalsByUserIds(userIds) {
+      async function fetchFundedMapByUserIds(userIds) {
         var map = Object.create(null);
         if (!userIds || !userIds.length) return map;
 
-        // IMPORTANT: This may be blocked by RLS in your database. We handle failures safely.
-        var url = "https://oyowsjjmaesspqiknvhp.supabase.co" + "/rest/v1/v_user_total_deposit"
-          + "?select=user_id,total_deposit"
-          + "&user_id=" + inFilter(userIds)
-          + "&limit=1000";
+        // 1) Preferred: RPC (SECURITY DEFINER) => works even when RLS blocks direct table/view reads
+        try {
+          var rpcUrl = SB_CONFIG.url + "/rest/v1/rpc/rpc_users_funded";
+          var resRpc = await fetch(rpcUrl, {
+            method: "POST",
+            headers: SB_CONFIG.headers(),
+            body: JSON.stringify({ p_user_ids: userIds })
+          });
+          if (resRpc.ok) {
+            var rowsRpc = await resRpc.json();
+            if (Array.isArray(rowsRpc)) {
+              rowsRpc.forEach(function (r) {
+                if (!r || !r.user_id) return;
+                map[r.user_id] = !!r.funded;
+              });
+              return map;
+            }
+          }
+        } catch (e) {}
 
-        var res = await fetch(url, { method: "GET", headers: apiHeaders() });
-        if (!res.ok) return map;
+        // 2) Fallback: old view-based approach (may be blocked by RLS)
+        try {
+          var url = SB_CONFIG.url + "/rest/v1/v_user_total_deposit"
+            + "?select=user_id,total_deposit"
+            + "&user_id=" + inFilter(userIds)
+            + "&limit=1000";
+          var res = await fetch(url, { method: "GET", headers: SB_CONFIG.headers() });
+          if (!res.ok) return map;
+          var rows = await res.json();
+          if (!Array.isArray(rows)) return map;
+          rows.forEach(function (r) {
+            if (!r || !r.user_id) return;
+            map[r.user_id] = Number(r.total_deposit || 0) > 0;
+          });
+        } catch (e2) {}
 
-        var rows = await res.json();
-        if (!Array.isArray(rows)) return map;
-
-        rows.forEach(function (r) {
-          if (!r || !r.user_id) return;
-          map[r.user_id] = Number(r.total_deposit || 0);
-        });
         return map;
       }
 
-      function countFunded(userIds, depositMap) {
+      function countFunded(userIds, fundedMap) {
         var c = 0;
         (userIds || []).forEach(function (id) {
-          var dep = depositMap && depositMap[id] != null ? Number(depositMap[id]) : 0;
-          if (dep >= FUNDED_MIN_USDT) c++;
+          if (fundedMap && fundedMap[id] === true) c++;
         });
         return c;
       }
@@ -749,7 +759,7 @@
           // Now try to compute funded counts (real deposits)
           try {
             var allTeamIds = uniq(gen1Ids.concat(gen2Ids).concat(gen3Ids));
-            var depositMap = await fetchDepositTotalsByUserIds(allTeamIds);
+            var depositMap = await fetchFundedMapByUserIds(allTeamIds);
 
             var fundedGen1 = countFunded(gen1Ids, depositMap);
             var fundedGen2 = countFunded(gen2Ids, depositMap);
