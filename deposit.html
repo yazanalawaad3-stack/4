@@ -387,36 +387,32 @@
 
 <script>
   (function() {
-    var SUPABASE_URL = (window.SB_CONFIG && window.SB_CONFIG.url) ? window.SB_CONFIG.url : "https://oyowsjjmaesspqiknvhp.supabase.co";
+    var SUPABASE_URL = (window.SB_CONFIG && window.SB_CONFIG.url) ? window.SB_CONFIG.url : "";
     var SUPABASE_ANON_KEY = (window.SB_CONFIG && window.SB_CONFIG.anonKey) ? window.SB_CONFIG.anonKey : "";
-
     var EDGE_FUNCTION = (window.DEPOSIT_EDGE_FUNCTION || "generate-deposit-address");
 
-    // No hardcoded fallback addresses.
-    // We render a "loading" placeholder until the backend returns the per-user address.
     var networkConfigs = {
       "BEP20": { address: "" },
       "TRC20": { address: "" },
       "ERC20": { address: "" }
     };
-
     window.depositNetworkConfigs = networkConfigs;
 
     var currentCurrency = "USDT";
     var qrImgEl = document.getElementById("depositQr");
     var addressTextEl = document.querySelector(".address-text");
     var qrCaptionEl = document.querySelector(".qr-caption");
-    var networkButtons = document.querySelectorAll(".network-btn");
+    var networkButtons = Array.prototype.slice.call(document.querySelectorAll(".network-btn") || []);
+    var copyBtn = document.querySelector(".copy-btn");
 
     function placeholderQrDataUri() {
-      // Simple offline placeholder with a center circle (connection/loaded indicator)
-      var svg = "" +
-        "<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220' viewBox='0 0 220 220'>" +
-        "<rect width='220' height='220' fill='#fff'/>" +
-        "<rect x='10' y='10' width='200' height='200' rx='12' fill='none' stroke='#d9d9d9' stroke-width='2'/>" +
-        "<circle cx='110' cy='110' r='26' fill='#fff' stroke='#111' stroke-width='6'/>" +
-        "<circle cx='110' cy='110' r='10' fill='#111'/>" +
-        "</svg>";
+      var svg = ""
+        + "<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220' viewBox='0 0 220 220'>"
+        + "<rect width='220' height='220' fill='#fff'/>"
+        + "<rect x='10' y='10' width='200' height='200' rx='12' fill='none' stroke='#d9d9d9' stroke-width='2'/>"
+        + "<circle cx='110' cy='110' r='26' fill='#fff' stroke='#111' stroke-width='6'/>"
+        + "<circle cx='110' cy='110' r='10' fill='#111'/>"
+        + "</svg>";
       return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
     }
 
@@ -431,16 +427,28 @@
       qrImgEl.src = url;
     }
 
+    function setActiveNetwork(network) {
+      networkButtons.forEach(function(b) {
+        var t = (b.textContent || "").trim().toUpperCase();
+        if (t === network) b.classList.add("active");
+        else b.classList.remove("active");
+      });
+      updateAddress(network);
+    }
+
     function updateAddress(network) {
-      var config = networkConfigs[network];
-      if (!config || !addressTextEl || !qrCaptionEl) return;
+      var cfg = networkConfigs[network];
+      if (!cfg || !addressTextEl || !qrCaptionEl) return;
 
-      var addr = (config.address || "").trim();
-
+      var addr = (cfg.address || "").trim();
       if (!addr) {
         addressTextEl.textContent = "Loading...";
         updateQr("");
-        qrCaptionEl.textContent = "Fetching " + network + " " + currentCurrency + " address...";
+        if (network === "BEP20") {
+          qrCaptionEl.textContent = "Fetching " + network + " " + currentCurrency + " address...";
+        } else {
+          qrCaptionEl.textContent = "This network is not available yet.";
+        }
         return;
       }
 
@@ -449,81 +457,112 @@
       qrCaptionEl.textContent = "This address only supports deposits of " + network + " " + currentCurrency;
     }
 
-    function setActiveNetwork(network) {
-      networkButtons.forEach(function(b) {
-        if ((b.textContent || "").trim() === network) b.classList.add("active");
-        else b.classList.remove("active");
-      });
-      updateAddress(network);
+    async function getCurrentSupabaseUserId() {
+      try {
+        if (window.ExaAuth && typeof window.ExaAuth.ensureSupabaseUserId === "function") {
+          var id = await window.ExaAuth.ensureSupabaseUserId();
+          return id ? String(id) : "";
+        }
+      } catch (e) {}
+      return "";
     }
 
+    async function fetchDepositAddresses() {
+      if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+        return;
+      }
+      var userId = await getCurrentSupabaseUserId();
+      if (!userId) return;
+
+      var fnUrl = String(SUPABASE_URL).replace(/\/$/, "") + "/functions/v1/" + EDGE_FUNCTION;
+
+      var payload = {
+        user_id: userId,
+        currency: currentCurrency,
+        networks: ["BEP20", "TRC20", "ERC20"]
+      };
+
+      try {
+        var r = await fetch(fnUrl, {
+          method: "POST",
+          headers: {
+            "apikey": SUPABASE_ANON_KEY,
+            "Authorization": "Bearer " + SUPABASE_ANON_KEY,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(payload)
+        });
+
+        var data = null;
+        try { data = await r.json(); } catch (e) { data = null; }
+
+        if (!data) return;
+
+        var addrs = data.addresses || null;
+        if (!addrs && data.network && data.address) {
+          addrs = {};
+          addrs[String(data.network).toUpperCase()] = String(data.address);
+        }
+
+        if (addrs && typeof addrs === "object") {
+          Object.keys(addrs).forEach(function(k) {
+            var key = String(k).toUpperCase();
+            if (networkConfigs[key]) {
+              networkConfigs[key].address = String(addrs[k] || "");
+            }
+          });
+        }
+      } catch (e) {
+        // keep placeholder; avoid breaking UI
+        if (qrCaptionEl) qrCaptionEl.textContent = "Unable to fetch deposit address.";
+      }
+    }
+
+    if (copyBtn) {
+      copyBtn.addEventListener("click", function() {
+        var v = addressTextEl ? String(addressTextEl.textContent || "").trim() : "";
+        if (!v || v.toLowerCase() === "loading..." || v.toLowerCase() === "loading.") return;
+        if (navigator && navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(v).catch(function() {});
+        } else {
+          try {
+            var ta = document.createElement("textarea");
+            ta.value = v;
+            ta.style.position = "fixed";
+            ta.style.left = "-9999px";
+            document.body.appendChild(ta);
+            ta.focus();
+            ta.select();
+            document.execCommand("copy");
+            document.body.removeChild(ta);
+          } catch (e) {}
+        }
+      });
+    }
+
+    // Wire network buttons
     networkButtons.forEach(function(btn) {
       btn.addEventListener("click", function() {
-        var network = (btn.textContent || "").trim();
+        var network = (btn.textContent || "").trim().toUpperCase();
         if (!networkConfigs[network]) return;
         setActiveNetwork(network);
       });
     });
 
-    function getCurrentSupabaseUserId() {
-      try {
-        if (window.ExaAuth && typeof window.ExaAuth.ensureSupabaseUserId === "function") {
-          return window.ExaAuth.ensureSupabaseUserId().then(function (id) {
-            return id ? String(id) : "";
-          });
-        }
-      } catch (e) {}
-      return Promise.resolve("");
-    }
-
-    function fetchDepositAddresses() {
-      getCurrentSupabaseUserId().then(function (userId) {
-        if (!userId) return;
-
-        var fnUrl = https://oyowsjjmaesspqiknvhp.supabase.co + "/functions/v1/" + EDGE_FUNCTION;
-
-        return fetch(fnUrl, {
-          method: "POST",
-          headers: {
-            "apikey": eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im95b3dzamptYWVzc3BxaWtudmhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU4MTE4NzcsImV4cCI6MjA4MTM4Nzg3N30.aBo32xNG_dh1QD7NBI4N6jhYFLY42Xyxer2DNXxJi-w,
-            "Authorization": "Bearer " + eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im95b3dzamptYWVzc3BxaWtudmhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU4MTE4NzcsImV4cCI6MjA4MTM4Nzg3N30.aBo32xNG_dh1QD7NBI4N6jhYFLY42Xyxer2DNXxJi-w,
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({ user_id: userId })
-        })
-        .then(function(r) { return r.json(); })
-        .then(function(data) {
-        if (!data) return;
-        var addrs = data.addresses || null;
-        // Some deployments may return {network, address} when a single network is requested
-        if (!addrs && data.network && data.address) {
-          addrs = {};
-          addrs[String(data.network)] = String(data.address);
-        }
-        if (!addrs) return;
-
-        Object.keys(addrs).forEach(function(net) {
-          if (!networkConfigs[net]) return;
-          var a = addrs[net];
-          if (a) networkConfigs[net].address = String(a);
-        });
-
-        // Refresh currently selected network
-        var activeBtn = document.querySelector(".network-btn.active");
-        var activeNetwork = activeBtn ? (activeBtn.textContent || "").trim() : "BEP20";
-        updateAddress(activeNetwork);
-        })
-        .catch(function() {
-          // silent - fallback addresses stay in place
-        });
-      });
-    }
-
     // Init
+    updateQr("");
     setActiveNetwork("BEP20");
-    fetchDepositAddresses();
+    fetchDepositAddresses().then(function() {
+      // refresh current view after load
+      var active = "BEP20";
+      networkButtons.forEach(function(b) {
+        if (b.classList.contains("active")) active = (b.textContent || "BEP20").trim().toUpperCase();
+      });
+      updateAddress(active);
+    });
   })();
 </script>
+
 
 <script>
   (function () {
