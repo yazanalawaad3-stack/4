@@ -389,7 +389,7 @@
   (function() {
     var SUPABASE_URL = (window.SB_CONFIG && window.SB_CONFIG.url) ? window.SB_CONFIG.url : "";
     var SUPABASE_ANON_KEY = (window.SB_CONFIG && window.SB_CONFIG.anonKey) ? window.SB_CONFIG.anonKey : "";
-    var EDGE_FUNCTION = (window.DEPOSIT_EDGE_FUNCTION || "generate-deposit-address");
+    var EDGE_FUNCTION = (window.DEPOSIT_EDGE_FUNCTION || "nowpayments-create-payment");
 
     var networkConfigs = {
       "BEP20": { address: "" },
@@ -478,6 +478,7 @@
 
       var payload = {
         user_id: userId,
+        amount_usd: (window.DEPOSIT_AMOUNT_USD || 10),
         currency: currentCurrency,
         networks: ["BEP20", "TRC20", "ERC20"]
       };
@@ -499,6 +500,12 @@
         if (!data) return;
 
         var addrs = data.addresses || null;
+
+        // NOWPayments edge function shape
+        if (!addrs && data.pay_address) {
+          addrs = { "BEP20": String(data.pay_address) };
+        }
+
         if (!addrs && data.network && data.address) {
           addrs = {};
           addrs[String(data.network).toUpperCase()] = String(data.address);
