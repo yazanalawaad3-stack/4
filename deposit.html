@@ -1,125 +1,713 @@
 <!DOCTYPE html>
+
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Deposit</title>
-  <!-- Keep your existing CSS/markup: this file only replaces the JS logic safely. -->
+<meta charset="utf-8"/>
+<title>Deposit</title>
+<meta content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" name="viewport"/>
+<style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      min-height: 100vh;
+      background-color: #05070b;
+      color: #ffffff;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+    }
+
+    .page {
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+
+    .header {
+      height: 44px;
+      padding: 0 16px;
+      display: flex;
+      align-items: center;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      flex-shrink: 0;
+    }
+
+    .header-left {
+      width: 40px;
+      display: flex;
+      align-items: center;
+    }
+
+    .back-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 24px;
+      height: 24px;
+    }
+
+    .back-icon {
+      width: 10px;
+      height: 10px;
+      border-left: 2px solid #ffffff;
+      border-bottom: 2px solid #ffffff;
+      transform: rotate(45deg);
+    }
+
+    .header-title {
+      flex: 1;
+      text-align: center;
+      font-size: 16px;
+      font-weight: 500;
+    }
+
+    .header-right {
+      width: 40px;
+      display: flex;
+      justify-content: flex-end;
+    }
+
+    .bill-link {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 24px;
+      height: 24px;
+    }
+
+    .bill-icon {
+      width: 20px;
+      height: 20px;
+      display: block;
+    }
+
+    .main {
+      flex: 1;
+      padding: 10px 12px 24px;
+      overflow-y: auto;
+    }
+
+    .tip-banner a {
+      color: #00d1ff;
+      text-decoration: none;
+    }
+
+    .section-label {
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.75);
+      margin-bottom: 6px;
+      margin-top: 4px;
+    }
+
+    .currency-box {
+      height: 40px;
+      border-radius: 8px;
+      background-color: #101b20;
+      padding: 0 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 13px;
+      margin-bottom: 14px;
+    }
+
+    .currency-arrow {
+      width: 8px;
+      height: 8px;
+      border-left: 2px solid rgba(255, 255, 255, 0.7);
+      border-bottom: 2px solid rgba(255, 255, 255, 0.7);
+      transform: rotate(-45deg);
+    }
+
+    .network-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    .network-btn {
+      flex: 1;
+      height: 36px;
+      border-radius: 8px;
+      background-color: #101b20;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      color: rgba(255, 255, 255, 0.85);
+      border: 1px solid transparent;
+    }
+
+    .network-btn.active {
+      border-color: #00d1ff;
+      box-shadow: 0 0 0 1px rgba(0, 209, 255, 0.35);
+      color: #00d1ff;
+    }
+
+    .qr-wrapper {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .qr-box {
+      width: 190px;
+      height: 190px;
+      padding: 10px;
+      background-color: #ffffff;
+      border-radius: 8px;
+      margin-bottom: 8px;
+    }
+
+    .qr-inner {
+      width: 100%;
+      height: 100%;
+      display: block;
+      object-fit: contain;
+    }
+
+    .qr-caption {
+      font-size: 11px;
+      color: rgba(255, 255, 255, 0.7);
+      text-align: center;
+    }
+
+    .address-box {
+      height: 44px;
+      border-radius: 8px;
+      background-color: #182334;
+      padding: 0 10px;
+      margin-bottom: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+
+    .address-text {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      padding-right: 10px;
+    }
+
+    .copy-btn {
+      width: 26px;
+      height: 26px;
+      border-radius: 6px;
+      border: 1px solid rgba(255, 255, 255, 0.4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .copy-btn img {
+      width: 16px;
+      height: 16px;
+      display: block;
+    }
+
+    .reminder-title {
+      font-size: 13px;
+      font-weight: 500;
+      margin-bottom: 8px;
+    }
+
+    .reminder-list {
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.75);
+      line-height: 1.5;
+      padding-left: 16px;
+    }
+
+    .reminder-list li {
+      margin-bottom: 6px;
+    }
+
+    .highlight {
+      color: #00d1ff;
+    }
+  
+    .copy-top-link {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .currency-modal-mask {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.6);
+      display: none;
+      z-index: 50;
+    }
+
+    .currency-modal-mask.show {
+      display: block;
+    }
+
+    .currency-modal {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      transform: translateY(100%);
+      background-color: #050811;
+      border-top-left-radius: 16px;
+      border-top-right-radius: 16px;
+      padding: 12px 16px 20px;
+      z-index: 51;
+      transition: transform 0.2s ease-out;
+    }
+
+    .currency-modal.show {
+      transform: translateY(0);
+    }
+
+    .currency-modal-header {
+      font-size: 14px;
+      text-align: center;
+      margin-bottom: 12px;
+      color: rgba(255, 255, 255, 0.9);
+    }
+
+    .currency-option-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .currency-option {
+      height: 42px;
+      border-radius: 10px;
+      background-color: #172133;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      color: #ffffff;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .currency-option:active {
+      background-color: #1f2b40;
+    }
+
+    .currency-left {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .currency-icon {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      display: block;
+    }
+
+    .currency-option {
+      justify-content: flex-start;
+      padding: 0 16px;
+      gap: 8px;
+    }
+
+    .currency-option-icon {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      display: block;
+      margin-right: 8px;
+    }
+
+</style>
 </head>
 <body>
-  <!-- IMPORTANT:
-       Copy/paste ONLY the script block below into your existing deposit.html (before </body>),
-       or replace your deposit.html with your own design + this script.
-  -->
+<div class="page">
+<div class="header">
+<div class="header-left">
+<a aria-label="Back" class="back-btn" href="javascript:history.back();">
+<span class="back-icon"></span>
+</a>
+</div>
+<div class="header-title">Deposit</div>
+<div class="header-right">
+  <a href="bills.html" class="bill-link">
+    <img src="images/bills-icon.png" alt="Bills" class="bill-icon"/>
+  </a>
+</div>
+</div>
+<div class="main">
+<div class="section-label">Deposit Currency</div>
+<div class="currency-box">
+  <div class="currency-left">
+    <img src="images/usdt.png" alt="USDT" class="currency-icon"/>
+    <span class="currency-text">USDT</span>
+  </div>
+</div>
+<div class="section-label">Deposit Network</div>
+<div class="network-row">
+<div class="network-btn active">BEP20</div>
+<div class="network-btn">TRC20</div>
+<div class="network-btn">ERC20</div>
+</div>
+<div class="qr-wrapper">
+<div class="qr-box">
+  <img src="images/deposit-qr.png" alt="Deposit QR Code" class="qr-inner" id="depositQr"/>
+</div>
+<div class="qr-caption">
+          This address only supports deposits of BEP20 USDT
+        </div>
+</div>
+<div class="section-label">Deposit Address</div>
+<div class="address-box">
+<div class="address-text">Loading...</div>
+<button class="copy-btn" type="button">
+<img alt="Copy" src="images/back-icon-D2ne3Npi.png"/>
+</button>
+</div>
+<div class="reminder-title">Friendly Reminder</div>
+<ol class="reminder-list">
+<li>Please do not recharge any USDT currency that is not a BEP20 network to the above address, otherwise the assets will not be retrieved.</li>
+<li>After you recharge to the above address, the entire network node needs to confirm, and the payment will be made after the network confirms.</li>
+<li>The minimum recharge amount is: <span class="highlight">0.1 USDT</span>. Recharge amounts less than the minimum amount will not be posted to the account and cannot be refunded.</li>
+<li>Each time you recharge, you need to go to the recharge page to check the latest address, which will be updated from time to time.</li>
+<li>Be sure to confirm the security of your computer and browser to prevent information from being tampered with or leaked.</li>
+<li>Please do not deposit NFT to this address.</li>
+<li>Recharge through smart contracts is not supported. Do not recharge USDT through ERC20, Arbitrum and Optimism networks.</li>
+</ol>
+</div>
+
   <script src="sb-config.js"></script>
-  <script src="sb-user.js"></script>
-  <script src="auth.js"></script>
+<script src="auth.js"></script>
+<script src="common-nav.js"></script>
 
-  <script>
-  (function () {
-    // ====== CONFIG ======
-    const FUNCTION_NAME = "nowpayments-create-payment"; // existing Edge Function
-    const DEFAULT_AMOUNT_USD = 100; // change if you want a different default
-    const PAY_CURRENCY = "usdtbsc"; // BEP20 USDT for NOWPayments
 
-    // ====== HELPERS ======
-    function qs(sel){ return document.querySelector(sel); }
-    function setText(el, txt){ if(el) el.textContent = txt; }
-    function setValue(el, val){ if(el) el.value = val; }
-    function showError(msg){
-      console.error(msg);
-      const addrBox = qs("#depositAddress") || qs("[data-deposit-address]");
-      if (addrBox) setText(addrBox, msg);
+<script>
+  (function() {
+    var SUPABASE_URL = (window.SB_CONFIG && window.SB_CONFIG.url) ? window.SB_CONFIG.url : "";
+    var SUPABASE_ANON_KEY = (window.SB_CONFIG && window.SB_CONFIG.anonKey) ? window.SB_CONFIG.anonKey : "";
+    var EDGE_FUNCTION = (window.DEPOSIT_EDGE_FUNCTION || "generate-deposit-address");
+
+    var networkConfigs = {
+      "BEP20": { address: "" },
+      "TRC20": { address: "" },
+      "ERC20": { address: "" }
+    };
+    window.depositNetworkConfigs = networkConfigs;
+
+    var currentCurrency = "USDT";
+    var qrImgEl = document.getElementById("depositQr");
+    var addressTextEl = document.querySelector(".address-text");
+    var qrCaptionEl = document.querySelector(".qr-caption");
+    var networkButtons = Array.prototype.slice.call(document.querySelectorAll(".network-btn") || []);
+    var copyBtn = document.querySelector(".copy-btn");
+
+    function placeholderQrDataUri() {
+      var svg = ""
+        + "<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220' viewBox='0 0 220 220'>"
+        + "<rect width='220' height='220' fill='#fff'/>"
+        + "<rect x='10' y='10' width='200' height='200' rx='12' fill='none' stroke='#d9d9d9' stroke-width='2'/>"
+        + "<circle cx='110' cy='110' r='26' fill='#fff' stroke='#111' stroke-width='6'/>"
+        + "<circle cx='110' cy='110' r='10' fill='#111'/>"
+        + "</svg>";
+      return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
     }
 
-    // ====== UI HOOKS (support your existing DOM) ======
-    // Tries a few common ids/classes used in your page.
-    const elAddress = qs("#depositAddress") || qs(".deposit-address") || qs("[data-deposit-address]");
-    const elQrImg   = qs("#depositQr") || qs("#qrImage") || qs("img[data-deposit-qr]") || qs(".qr img");
-    const elStatus  = qs("#depositStatus") || qs(".deposit-status") || qs("[data-deposit-status]");
+    function updateQr(address) {
+      if (!qrImgEl) return;
+      var data = address ? String(address).trim() : "";
+      if (!data) {
+        qrImgEl.src = placeholderQrDataUri();
+        return;
+      }
+      var url = "https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=" + encodeURIComponent(data);
+      qrImgEl.src = url;
+    }
 
-    async function getSessionToken(){
-      try {
-        if (window.sbUser?.getSession) {
-          const s = await window.sbUser.getSession();
-          return s?.access_token || null;
+    function setActiveNetwork(network) {
+      networkButtons.forEach(function(b) {
+        var t = (b.textContent || "").trim().toUpperCase();
+        if (t === network) b.classList.add("active");
+        else b.classList.remove("active");
+      });
+      updateAddress(network);
+    }
+
+    function updateAddress(network) {
+      var cfg = networkConfigs[network];
+      if (!cfg || !addressTextEl || !qrCaptionEl) return;
+
+      var addr = (cfg.address || "").trim();
+      if (!addr) {
+        addressTextEl.textContent = "Loading...";
+        updateQr("");
+        if (network === "BEP20") {
+          qrCaptionEl.textContent = "Fetching " + network + " " + currentCurrency + " address...";
+        } else {
+          qrCaptionEl.textContent = "This network is not available yet.";
         }
-      } catch(e) {}
-      // fallback: raw localStorage used by your auth.js
-      const raw = localStorage.getItem("sb_access_token");
-      return raw || null;
-    }
-
-    async function getUserId(){
-      try {
-        if (window.ExaAuth?.ensureSupabaseUserId) {
-          return await window.ExaAuth.ensureSupabaseUserId();
-        }
-      } catch(e) {}
-      return localStorage.getItem("supabase_user_id");
-    }
-
-    function makeQrUrl(text){
-      // No external libs needed. Uses a free QR image endpoint.
-      // If you already have a local qr generator, replace this.
-      return "https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=" + encodeURIComponent(text);
-    }
-
-    async function fetchDepositAddress(){
-      if (!window.SUPABASE_URL || !window.SUPABASE_ANON_KEY) {
-        showError("Supabase config missing");
         return;
       }
 
-      const user_id = await getUserId();
-      if (!user_id) {
-        showError("Please login first");
+      addressTextEl.textContent = addr;
+      updateQr(addr);
+      qrCaptionEl.textContent = "This address only supports deposits of " + network + " " + currentCurrency;
+    }
+
+    async function getCurrentSupabaseUserId() {
+      try {
+        if (window.ExaAuth && typeof window.ExaAuth.ensureSupabaseUserId === "function") {
+          var id = await window.ExaAuth.ensureSupabaseUserId();
+          return id ? String(id) : "";
+        }
+      } catch (e) {}
+      return "";
+    }
+
+    async function fetchDepositAddresses() {
+      if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
         return;
       }
+      var userId = await getCurrentSupabaseUserId();
+      if (!userId) return;
 
-      setText(elStatus, "Fetching BEP20 USDT address...");
-      setText(elAddress, "Loading...");
+      var fnUrl = String(SUPABASE_URL).replace(/\/$/, "") + "/functions/v1/" + EDGE_FUNCTION;
 
-      const url = window.SUPABASE_URL.replace(/\/$/, "") + "/functions/v1/" + FUNCTION_NAME;
-
-      const token = await getSessionToken(); // may be null; function uses service role internally
-      const headers = {
-        "Content-Type": "application/json",
-        "apikey": window.SUPABASE_ANON_KEY
-      };
-      if (token) headers["Authorization"] = "Bearer " + token;
-
-      const body = {
-        user_id,
-        amount_usd: DEFAULT_AMOUNT_USD,
-        pay_currency: PAY_CURRENCY
+      var payload = {
+        user_id: userId,
+        currency: currentCurrency,
+        networks: ["BEP20", "TRC20", "ERC20"]
       };
 
       try {
-        const res = await fetch(url, { method: "POST", headers, body: JSON.stringify(body) });
-        const json = await res.json().catch(() => ({}));
-        if (!res.ok) {
-          showError("Create payment failed: " + (json?.error || res.status));
-          return;
+        var r = await fetch(fnUrl, {
+          method: "POST",
+          headers: {
+            "apikey": SUPABASE_ANON_KEY,
+            "Authorization": "Bearer " + SUPABASE_ANON_KEY,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(payload)
+        });
+
+        var data = null;
+        try { data = await r.json(); } catch (e) { data = null; }
+
+        if (!data) return;
+
+        var addrs = data.addresses || null;
+        if (!addrs && data.network && data.address) {
+          addrs = {};
+          addrs[String(data.network).toUpperCase()] = String(data.address);
         }
 
-        const addr = json?.pay_address || json?.address || "";
-        if (!addr) {
-          showError("No address returned");
-          return;
+        if (addrs && typeof addrs === "object") {
+          Object.keys(addrs).forEach(function(k) {
+            var key = String(k).toUpperCase();
+            if (networkConfigs[key]) {
+              networkConfigs[key].address = String(addrs[k] || "");
+            }
+          });
         }
-
-        setText(elStatus, "This address only supports deposits of BEP20 USDT");
-        setText(elAddress, addr);
-
-        if (elQrImg) elQrImg.src = makeQrUrl(addr);
       } catch (e) {
-        showError("Network error: " + (e && e.message ? e.message : String(e)));
+        // keep placeholder; avoid breaking UI
+        if (qrCaptionEl) qrCaptionEl.textContent = "Unable to fetch deposit address.";
       }
     }
 
-    document.addEventListener("DOMContentLoaded", fetchDepositAddress);
+    if (copyBtn) {
+      copyBtn.addEventListener("click", function() {
+        var v = addressTextEl ? String(addressTextEl.textContent || "").trim() : "";
+        if (!v || v.toLowerCase() === "loading..." || v.toLowerCase() === "loading.") return;
+        if (navigator && navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(v).catch(function() {});
+        } else {
+          try {
+            var ta = document.createElement("textarea");
+            ta.value = v;
+            ta.style.position = "fixed";
+            ta.style.left = "-9999px";
+            document.body.appendChild(ta);
+            ta.focus();
+            ta.select();
+            document.execCommand("copy");
+            document.body.removeChild(ta);
+          } catch (e) {}
+        }
+      });
+    }
+
+    // Wire network buttons
+    networkButtons.forEach(function(btn) {
+      btn.addEventListener("click", function() {
+        var network = (btn.textContent || "").trim().toUpperCase();
+        if (!networkConfigs[network]) return;
+        setActiveNetwork(network);
+      });
+    });
+
+    // Init
+    updateQr("");
+    setActiveNetwork("BEP20");
+    fetchDepositAddresses().then(function() {
+      // refresh current view after load
+      var active = "BEP20";
+      networkButtons.forEach(function(b) {
+        if (b.classList.contains("active")) active = (b.textContent || "BEP20").trim().toUpperCase();
+      });
+      updateAddress(active);
+    });
   })();
-  </script>
+</script>
+
+
+<script>
+(function () {
+  const SB_URL = (window.SB_URL || (window.SB && window.SB.url)) || "";
+  const SB_ANON_KEY = (window.SB_ANON_KEY || (window.SB && window.SB.anonKey)) || "";
+
+  const networks = [
+    { key: "bep20", label: "BEP20" },
+    { key: "trc20", label: "TRC20" },
+    { key: "erc20", label: "ERC20" },
+  ];
+
+  function el(id) { return document.getElementById(id); }
+
+  function setStatus(text) {
+    const statusEl = document.querySelector(".qrcode-tip, #depositStatus, .deposit-status");
+    if (statusEl) statusEl.textContent = text;
+  }
+
+  function setAddress(text) {
+    const addrEl =
+      el("depositAddress") ||
+      document.querySelector("[data-deposit-address]") ||
+      document.querySelector(".deposit-address") ||
+      document.querySelector("#addressText");
+    if (addrEl) addrEl.textContent = text;
+  }
+
+  function setQr(dataUrl) {
+    const img =
+      el("depositQr") ||
+      document.querySelector("img.qrcode") ||
+      document.querySelector("#qrcodeImg") ||
+      document.querySelector("img[alt*='QR'], img[alt*='Qr'], img[alt*='qr']");
+    if (img) img.src = dataUrl;
+  }
+
+  function setActiveNetworkUI(netKey) {
+    const btns = document.querySelectorAll("[data-network]");
+    btns.forEach(b => b.classList.toggle("active", (b.getAttribute("data-network") || "").toLowerCase() === netKey));
+  }
+
+  async function ensureLoggedInUserId() {
+    if (!window.ExaAuth || typeof window.ExaAuth.ensureSupabaseUserId !== "function") {
+      return null;
+    }
+    try {
+      const id = await window.ExaAuth.ensureSupabaseUserId();
+      return id || null;
+    } catch (e) {
+      console.error(e);
+      return null;
+    }
+  }
+
+  async function fetchDepositAddress(userId, netKey) {
+    if (!SB_URL || !SB_ANON_KEY) throw new Error("Missing Supabase config");
+    const url = new URL(SB_URL.replace(/\/+$/, "") + "/rest/v1/user_payout_addresses");
+    url.searchParams.set("select", "address,network,currency,created_at");
+    url.searchParams.set("user_id", "eq." + userId);
+    url.searchParams.set("currency", "eq.usdt");
+    url.searchParams.set("network", "eq." + netKey);
+    url.searchParams.set("order", "created_at.desc");
+    url.searchParams.set("limit", "1");
+
+    const res = await fetch(url.toString(), {
+      method: "GET",
+      headers: {
+        "apikey": SB_ANON_KEY,
+        "Authorization": "Bearer " + SB_ANON_KEY,
+        "Accept": "application/json",
+      }
+    });
+    if (!res.ok) {
+      const t = await res.text().catch(() => "");
+      throw new Error("REST error " + res.status + " " + t);
+    }
+    const rows = await res.json();
+    return rows && rows[0] && rows[0].address ? rows[0].address : null;
+  }
+
+  async function renderForNetwork(userId, netKey) {
+    setActiveNetworkUI(netKey);
+    setStatus("Loading...");
+    setAddress("Loading...");
+
+    try {
+      const address = await fetchDepositAddress(userId, netKey);
+      if (!address) {
+        setStatus("No address assigned for " + netKey.toUpperCase());
+        setAddress("-");
+        setQr("");
+        return;
+      }
+
+      setStatus("This address only supports deposits of " + netKey.toUpperCase() + " USDT");
+      setAddress(address);
+
+      if (window.QRCode && typeof window.QRCode.toDataURL === "function") {
+        const dataUrl = await window.QRCode.toDataURL(address, { width: 220, margin: 1 });
+        setQr(dataUrl);
+      } else if (window.QRCode && typeof window.QRCode.toCanvas === "function") {
+        // fallback: leave as-is
+      }
+    } catch (e) {
+      console.error(e);
+      setStatus("Failed to load address");
+      setAddress("-");
+      setQr("");
+    }
+  }
+
+  function wireNetworkButtons(userId) {
+    // If HTML already has buttons, make them emit data-network
+    const byText = (txt) => Array.from(document.querySelectorAll("button, .network-btn, .tab-btn, .deposit-network-item"))
+      .find(b => (b.textContent || "").trim().toUpperCase() === txt);
+
+    // Set data-network on known buttons if missing
+    networks.forEach(n => {
+      const btn = document.querySelector("[data-network='" + n.key + "']") || byText(n.label);
+      if (btn && !btn.getAttribute("data-network")) btn.setAttribute("data-network", n.key);
+    });
+
+    document.querySelectorAll("[data-network]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const netKey = (btn.getAttribute("data-network") || "").toLowerCase();
+        if (!netKey) return;
+        renderForNetwork(userId, netKey);
+      });
+    });
+  }
+
+  (async function init() {
+    const userId = await ensureLoggedInUserId();
+    if (!userId) {
+      setStatus("Please login first");
+      setAddress("Please login first");
+      setQr("");
+      return;
+    }
+    wireNetworkButtons(userId);
+    await renderForNetwork(userId, "bep20");
+  })();
+})();
+</script>
+
 </body>
 </html>
