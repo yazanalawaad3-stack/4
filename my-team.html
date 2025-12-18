@@ -650,6 +650,18 @@
           headers: apiHeaders(),
           body: JSON.stringify({ user_ids: userIds })
         });
+
+        // Backward compatible: some DB versions used param name p_user_ids
+        if (!res.ok) {
+          try {
+            res = await fetch(url, {
+              method: "POST",
+              headers: apiHeaders(),
+              body: JSON.stringify({ p_user_ids: userIds })
+            });
+          } catch (e) {}
+        }
+
         if (!res.ok) return map;
 
         var rows = await res.json();
