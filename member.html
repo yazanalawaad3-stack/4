@@ -1021,73 +1021,198 @@
 
 <script>
   (function () {
-    function getDemoUserInfo() {
-      var balance = parseFloat(localStorage.getItem("demoBalance") || "0");
-      var effectiveUsers = parseInt(localStorage.getItem("demoEffectiveUsers") || "0", 10);
+    'use strict';
 
-      if (isNaN(balance)) balance = 0;
-      if (isNaN(effectiveUsers)) effectiveUsers = 0;
+    var SB = window.SB_CONFIG;
+    function sbHeaders() { return SB && typeof SB.headers === 'function' ? SB.headers() : {}; }
 
-      return {
-        balance: balance,
-        effectiveUsers: effectiveUsers
-      };
+    function uniq(arr) {
+      var out = [];
+      var seen = {};
+      for (var i = 0; i < arr.length; i++) {
+        var v = arr[i];
+        if (!v || seen[v]) continue;
+        seen[v] = true;
+        out.push(v);
+      }
+      return out;
+    }
+
+    function chunk(arr, n) {
+      var out = [];
+      for (var i = 0; i < arr.length; i += n) out.push(arr.slice(i, i + n));
+      return out;
+    }
+
+    async function getCurrentUserId() {
+      try {
+        if (window.ExaAuth && typeof window.ExaAuth.ensureSupabaseUserId === 'function') {
+          return await window.ExaAuth.ensureSupabaseUserId();
+        }
+      } catch (e) {}
+      try { return localStorage.getItem('currentUserId') || localStorage.getItem('sb_user_id_v1') || ''; } catch (e2) { return ''; }
+    }
+
+    async function rpc(fnName, payload) {
+      var url = SB.url.replace(/\/$/, '') + '/rest/v1/rpc/' + encodeURIComponent(fnName);
+      var res = await fetch(url, {
+        method: 'POST',
+        headers: sbHeaders(),
+        body: JSON.stringify(payload || {})
+      });
+      var text = await res.text();
+      var data;
+      try { data = text ? JSON.parse(text) : null; } catch (e) { data = text; }
+      if (!res.ok) {
+        var msg = (data && (data.message || data.error || data.details)) ? (data.message || data.error || data.details) : ('RPC ' + fnName + ' failed');
+        throw new Error(msg);
+      }
+      return data;
+    }
+
+    async function fetchUsersByInviterIds(inviterIds) {
+      inviterIds = Array.isArray(inviterIds) ? inviterIds.filter(Boolean) : [];
+      if (!inviterIds.length) return [];
+      // Supabase REST has a URL length limit, chunk the IN list
+      var all = [];
+      var groups = chunk(inviterIds, 60);
+      for (var i = 0; i < groups.length; i++) {
+        var ids = groups[i];
+        var inList = '(' + ids.map(function (x) { return '"' + String(x).replace(/"/g,'') + '"'; }).join(',') + ')';
+        var url = SB.url.replace(/\/$/, '') + '/rest/v1/users?select=id,inviter_id&inviter_id=in.' + encodeURIComponent(inList) + '&order=created_at.asc';
+        var res = await fetch(url, { method: 'GET', headers: sbHeaders() });
+        if (!res.ok) continue;
+        var rows = await res.json();
+        if (Array.isArray(rows) && rows.length) all = all.concat(rows);
+      }
+      return all;
+    }
+
+    async function fetchWalletBalance(uid) {
+      var url = SB.url.replace(/\/$/, '') + '/rest/v1/wallet_balances?select=usdt_balance&user_id=eq.' + encodeURIComponent(uid) + '&limit=1';
+      var res = await fetch(url, { method: 'GET', headers: sbHeaders() });
+      if (!res.ok) return 0;
+      var rows = await res.json();
+      var v = rows && rows[0] ? Number(rows[0].usdt_balance) : 0;
+      return isFinite(v) ? v : 0;
+    }
+
+    async function fetchFundedMapByUserIds(userIds) {
+      userIds = Array.isArray(userIds) ? userIds.filter(Boolean) : [];
+      var map = {};
+      if (!userIds.length) return map;
+
+      // Try both possible arg names to be safe (depending on how the function was created)
+      var payloads = [
+        { user_ids: userIds },
+        { p_user_ids: userIds }
+      ];
+
+      var rows = null;
+      for (var i = 0; i < payloads.length; i++) {
+        try {
+          rows = await rpc('rpc_users_funded', payloads[i]);
+          break;
+        } catch (e) {
+          rows = null;
+        }
+      }
+
+      if (!Array.isArray(rows)) return map;
+      rows.forEach(function (r) {
+        if (!r) return;
+        var id = r.user_id || r.userId || r.id;
+        if (!id) return;
+        map[String(id)] = !!(r.funded === true || r.funded === 'true' || r.is_funded === true || r.is_funded === 'true');
+      });
+      return map;
+    }
+
+    function countFunded(ids, fundedMap) {
+      var c = 0;
+      for (var i = 0; i < ids.length; i++) {
+        if (fundedMap[ids[i]]) c++;
+      }
+      return c;
     }
 
     var rulesByLevel = {
-      V1: { minBalance: 50,   minUsersTotal: 0  },
-      V2: { minBalance: 500,  minUsersTotal: 5  },
-      V3: { minBalance: 3000, minUsersTotal: 10 },
-      V4: { minBalance: 10000,minUsersTotal: 30 },
-      V5: { minBalance: 30000,minUsersTotal: 50 },
+      V1: { minBalance: 50,    minUsersTotal: 0  },
+      V2: { minBalance: 500,   minUsersTotal: 5  },
+      V3: { minBalance: 3000,  minUsersTotal: 10 },
+      V4: { minBalance: 10000, minUsersTotal: 30 },
+      V5: { minBalance: 30000, minUsersTotal: 50 },
       V6: { minBalance: 100000,minUsersTotal: 75 }
     };
-
     var levelOrder = ["V0","V1","V2","V3","V4","V5","V6"];
 
     function calculateCurrentLevel(balance, totalUsers) {
       var current = "V0";
-
-      if (balance >= rulesByLevel.V1.minBalance && totalUsers >= rulesByLevel.V1.minUsersTotal) {
-        current = "V1";
-      }
-      if (balance >= rulesByLevel.V2.minBalance && totalUsers >= rulesByLevel.V2.minUsersTotal) {
-        current = "V2";
-      }
-      if (balance >= rulesByLevel.V3.minBalance && totalUsers >= rulesByLevel.V3.minUsersTotal) {
-        current = "V3";
-      }
+      if (balance >= rulesByLevel.V1.minBalance && totalUsers >= rulesByLevel.V1.minUsersTotal) current = "V1";
+      if (balance >= rulesByLevel.V2.minBalance && totalUsers >= rulesByLevel.V2.minUsersTotal) current = "V2";
+      if (balance >= rulesByLevel.V3.minBalance && totalUsers >= rulesByLevel.V3.minUsersTotal) current = "V3";
+      if (balance >= rulesByLevel.V4.minBalance && totalUsers >= rulesByLevel.V4.minUsersTotal) current = "V4";
+      if (balance >= rulesByLevel.V5.minBalance && totalUsers >= rulesByLevel.V5.minUsersTotal) current = "V5";
+      if (balance >= rulesByLevel.V6.minBalance && totalUsers >= rulesByLevel.V6.minUsersTotal) current = "V6";
       return current;
     }
 
-    function getNextLevel(current) {
-      if (current === "V0") return "V1";
-      if (current === "V1") return "V2";
-      if (current === "V2") return "V3";
-      return null;
+    function getNextLevel(currentLevel) {
+      var idx = levelOrder.indexOf(currentLevel);
+      if (idx < 0 || idx >= levelOrder.length - 1) return null;
+      return levelOrder[idx + 1];
     }
 
-    function applyVipLogic() {
-      var user = getDemoUserInfo();
-      var balance = user.balance;
-      var totalEffectiveUsers = user.effectiveUsers;
+    async function loadEffectiveUsersAndBalance() {
+      if (!SB || !SB.url) throw new Error('SB_CONFIG missing');
+      var myId = await getCurrentUserId();
+      if (!myId) throw new Error('Missing user session');
+
+      // 3-level downline like My Team page
+      var gen1 = await fetchUsersByInviterIds([myId]);
+      var gen1Ids = gen1.map(function (u) { return u.id; }).filter(Boolean);
+
+      var gen2 = gen1Ids.length ? await fetchUsersByInviterIds(gen1Ids) : [];
+      var gen2Ids = gen2.map(function (u) { return u.id; }).filter(Boolean);
+
+      var gen3 = gen2Ids.length ? await fetchUsersByInviterIds(gen2Ids) : [];
+      var gen3Ids = gen3.map(function (u) { return u.id; }).filter(Boolean);
+
+      var allTeamIds = uniq(gen1Ids.concat(gen2Ids).concat(gen3Ids));
+      var fundedMap = await fetchFundedMapByUserIds(allTeamIds);
+
+      var fundedGen1 = countFunded(gen1Ids, fundedMap);
+      var fundedGen2 = countFunded(gen2Ids, fundedMap);
+      var fundedGen3 = countFunded(gen3Ids, fundedMap);
+      var totalEffectiveUsers = fundedGen1 + fundedGen2 + fundedGen3;
+
+      var balance = await fetchWalletBalance(myId);
+
+      return { balance: balance, effectiveUsers: totalEffectiveUsers };
+    }
+
+    async function applyVipLogic() {
+      var balance = 0;
+      var totalEffectiveUsers = 0;
+
+      try {
+        var data = await loadEffectiveUsersAndBalance();
+        balance = typeof data.balance === 'number' ? data.balance : 0;
+        totalEffectiveUsers = typeof data.effectiveUsers === 'number' ? data.effectiveUsers : 0;
+      } catch (e) {
+        // Keep zeros if anything fails (page still renders)
+        balance = 0;
+        totalEffectiveUsers = 0;
+      }
 
       var currentLevel = calculateCurrentLevel(balance, totalEffectiveUsers);
       var nextLevel = getNextLevel(currentLevel);
 
       var pillSpan = document.querySelector(".current-level-pill span");
-      if (pillSpan) {
-        pillSpan.textContent = "Current Member Level:" + currentLevel;
-      }
+      if (pillSpan) pillSpan.textContent = "Current Member Level:" + currentLevel;
 
       var nextLevelEl = document.querySelector(".next-level");
-      if (nextLevelEl) {
-        if (nextLevel) {
-          nextLevelEl.textContent = "Next Level:" + nextLevel;
-        } else {
-          nextLevelEl.textContent = "Max Level";
-        }
-      }
+      if (nextLevelEl) nextLevelEl.textContent = nextLevel ? ("Next Level:" + nextLevel) : "Max Level";
 
       var sections = document.querySelectorAll(".vip-section");
       sections.forEach(function (sec) {
@@ -1101,22 +1226,14 @@
 
           var prevIndex = levelOrder.indexOf(level) - 1;
           var prevLevelName = prevIndex >= 1 ? levelOrder[prevIndex] : null;
-          var prevTotal = prevLevelName && rulesByLevel[prevLevelName]
-            ? rulesByLevel[prevLevelName].minUsersTotal
-            : 0;
+          var prevTotal = prevLevelName && rulesByLevel[prevLevelName] ? rulesByLevel[prevLevelName].minUsersTotal : 0;
 
           var requiredIncrement = rules.minUsersTotal - prevTotal;
           if (requiredIncrement < 0) requiredIncrement = 0;
 
-          var gainedForThisLevel = totalEffectiveUsers - prevTotal;
-          if (gainedForThisLevel < 0) gainedForThisLevel = 0;
-          if (gainedForThisLevel > requiredIncrement) gainedForThisLevel = requiredIncrement;
-
           if (requiredIncrement === 0) {
-            // No requirement for this level (مثل V1)، اعرض فقط إجمالي عدد المستخدمين الفعّالين
             statValues[1].textContent = totalEffectiveUsers + "/0";
           } else {
-            // Display total effective users against this level's required count
             statValues[1].textContent = totalEffectiveUsers + "/" + requiredIncrement;
           }
         }
@@ -1129,18 +1246,13 @@
           } else {
             achieved = balance >= rules.minBalance && totalEffectiveUsers >= rules.minUsersTotal;
           }
-
-          if (achieved && (level === currentLevel || level === "V1" || level === "V2" || level === "V3")) {
-            lockedLabel.textContent = "Unlocked";
-          } else {
-            lockedLabel.textContent = "Locked at this Level";
-          }
+          lockedLabel.textContent = achieved ? "Unlocked" : "Locked at this Level";
         }
       });
     }
 
     if (document.readyState === "loading") {
-      document.addEventListener("DOMContentLoaded", applyVipLogic);
+      document.addEventListener("DOMContentLoaded", function () { applyVipLogic(); });
     } else {
       applyVipLogic();
     }
