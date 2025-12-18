@@ -1,703 +1,156 @@
 <!DOCTYPE html>
-
 <html lang="en">
 <head>
-<meta charset="utf-8"/>
-<title>Deposit</title>
-<meta content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" name="viewport"/>
-<style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-
-    body {
-      min-height: 100vh;
-      background-color: #05070b;
-      color: #ffffff;
-      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
-    }
-
-    .page {
-      display: flex;
-      flex-direction: column;
-      min-height: 100vh;
-    }
-
-    .header {
-      height: 44px;
-      padding: 0 16px;
-      display: flex;
-      align-items: center;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-      flex-shrink: 0;
-    }
-
-    .header-left {
-      width: 40px;
-      display: flex;
-      align-items: center;
-    }
-
-    .back-btn {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 24px;
-      height: 24px;
-    }
-
-    .back-icon {
-      width: 10px;
-      height: 10px;
-      border-left: 2px solid #ffffff;
-      border-bottom: 2px solid #ffffff;
-      transform: rotate(45deg);
-    }
-
-    .header-title {
-      flex: 1;
-      text-align: center;
-      font-size: 16px;
-      font-weight: 500;
-    }
-
-    .header-right {
-      width: 40px;
-      display: flex;
-      justify-content: flex-end;
-    }
-
-    .bill-link {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 24px;
-      height: 24px;
-    }
-
-    .bill-icon {
-      width: 20px;
-      height: 20px;
-      display: block;
-    }
-
-    .main {
-      flex: 1;
-      padding: 10px 12px 24px;
-      overflow-y: auto;
-    }
-
-    .tip-banner a {
-      color: #00d1ff;
-      text-decoration: none;
-    }
-
-    .section-label {
-      font-size: 12px;
-      color: rgba(255, 255, 255, 0.75);
-      margin-bottom: 6px;
-      margin-top: 4px;
-    }
-
-    .currency-box {
-      height: 40px;
-      border-radius: 8px;
-      background-color: #101b20;
-      padding: 0 12px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      font-size: 13px;
-      margin-bottom: 14px;
-    }
-
-    .currency-arrow {
-      width: 8px;
-      height: 8px;
-      border-left: 2px solid rgba(255, 255, 255, 0.7);
-      border-bottom: 2px solid rgba(255, 255, 255, 0.7);
-      transform: rotate(-45deg);
-    }
-
-    .network-row {
-      display: flex;
-      gap: 8px;
-      margin-bottom: 16px;
-    }
-
-    .network-btn {
-      flex: 1;
-      height: 36px;
-      border-radius: 8px;
-      background-color: #101b20;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 13px;
-      color: rgba(255, 255, 255, 0.85);
-      border: 1px solid transparent;
-    }
-
-    .network-btn.active {
-      border-color: #00d1ff;
-      box-shadow: 0 0 0 1px rgba(0, 209, 255, 0.35);
-      color: #00d1ff;
-    }
-
-    .qr-wrapper {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      margin-bottom: 10px;
-    }
-
-    .qr-box {
-      width: 190px;
-      height: 190px;
-      padding: 10px;
-      background-color: #ffffff;
-      border-radius: 8px;
-      margin-bottom: 8px;
-    }
-
-    .qr-inner {
-      width: 100%;
-      height: 100%;
-      display: block;
-      object-fit: contain;
-    }
-
-    .qr-caption {
-      font-size: 11px;
-      color: rgba(255, 255, 255, 0.7);
-      text-align: center;
-    }
-
-    .address-box {
-      height: 44px;
-      border-radius: 8px;
-      background-color: #182334;
-      padding: 0 10px;
-      margin-bottom: 18px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      font-size: 12px;
-    }
-
-    .address-text {
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      padding-right: 10px;
-    }
-
-    .copy-btn {
-      width: 26px;
-      height: 26px;
-      border-radius: 6px;
-      border: 1px solid rgba(255, 255, 255, 0.4);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .copy-btn img {
-      width: 16px;
-      height: 16px;
-      display: block;
-    }
-
-    .reminder-title {
-      font-size: 13px;
-      font-weight: 500;
-      margin-bottom: 8px;
-    }
-
-    .reminder-list {
-      font-size: 12px;
-      color: rgba(255, 255, 255, 0.75);
-      line-height: 1.5;
-      padding-left: 16px;
-    }
-
-    .reminder-list li {
-      margin-bottom: 6px;
-    }
-
-    .highlight {
-      color: #00d1ff;
-    }
-  
-    .copy-top-link {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    .currency-modal-mask {
-      position: fixed;
-      inset: 0;
-      background: rgba(0, 0, 0, 0.6);
-      display: none;
-      z-index: 50;
-    }
-
-    .currency-modal-mask.show {
-      display: block;
-    }
-
-    .currency-modal {
-      position: fixed;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      transform: translateY(100%);
-      background-color: #050811;
-      border-top-left-radius: 16px;
-      border-top-right-radius: 16px;
-      padding: 12px 16px 20px;
-      z-index: 51;
-      transition: transform 0.2s ease-out;
-    }
-
-    .currency-modal.show {
-      transform: translateY(0);
-    }
-
-    .currency-modal-header {
-      font-size: 14px;
-      text-align: center;
-      margin-bottom: 12px;
-      color: rgba(255, 255, 255, 0.9);
-    }
-
-    .currency-option-list {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-
-    .currency-option {
-      height: 42px;
-      border-radius: 10px;
-      background-color: #172133;
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      color: #ffffff;
-      font-size: 14px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .currency-option:active {
-      background-color: #1f2b40;
-    }
-
-    .currency-left {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .currency-icon {
-      width: 18px;
-      height: 18px;
-      border-radius: 50%;
-      display: block;
-    }
-
-    .currency-option {
-      justify-content: flex-start;
-      padding: 0 16px;
-      gap: 8px;
-    }
-
-    .currency-option-icon {
-      width: 18px;
-      height: 18px;
-      border-radius: 50%;
-      display: block;
-      margin-right: 8px;
-    }
-
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Deposit</title>
+  <!-- Keep your existing CSS links unchanged in your project -->
+  <style>
+    /* This file keeps layout minimal; your original project CSS should style it.
+       If you already have a styled deposit.html, you can copy only the <script> part below. */
+  </style>
 </head>
 <body>
-<div class="page">
-<div class="header">
-<div class="header-left">
-<a aria-label="Back" class="back-btn" href="javascript:history.back();">
-<span class="back-icon"></span>
-</a>
-</div>
-<div class="header-title">Deposit</div>
-<div class="header-right">
-  <a href="bills.html" class="bill-link">
-    <img src="images/bills-icon.png" alt="Bills" class="bill-icon"/>
-  </a>
-</div>
-</div>
-<div class="main">
-<div class="section-label">Deposit Currency</div>
-<div class="currency-box">
-  <div class="currency-left">
-    <img src="images/usdt.png" alt="USDT" class="currency-icon"/>
-    <span class="currency-text">USDT</span>
-  </div>
-</div>
-<div class="section-label">Deposit Network</div>
-<div class="network-row">
-<div class="network-btn active">BEP20</div>
-<div class="network-btn">TRC20</div>
-<div class="network-btn">ERC20</div>
-</div>
-<div class="qr-wrapper">
-<div class="qr-box">
-  <img src="images/deposit-qr.png" alt="Deposit QR Code" class="qr-inner" id="depositQr"/>
-</div>
-<div class="qr-caption">
-          This address only supports deposits of BEP20 USDT
-        </div>
-</div>
-<div class="section-label">Deposit Address</div>
-<div class="address-box">
-<div class="address-text">Loading...</div>
-<button class="copy-btn" type="button">
-<img alt="Copy" src="images/back-icon-D2ne3Npi.png"/>
-</button>
-</div>
-<div class="reminder-title">Friendly Reminder</div>
-<ol class="reminder-list">
-<li>Please do not recharge any USDT currency that is not a BEP20 network to the above address, otherwise the assets will not be retrieved.</li>
-<li>After you recharge to the above address, the entire network node needs to confirm, and the payment will be made after the network confirms.</li>
-<li>The minimum recharge amount is: <span class="highlight">0.1 USDT</span>. Recharge amounts less than the minimum amount will not be posted to the account and cannot be refunded.</li>
-<li>Each time you recharge, you need to go to the recharge page to check the latest address, which will be updated from time to time.</li>
-<li>Be sure to confirm the security of your computer and browser to prevent information from being tampered with or leaked.</li>
-<li>Please do not deposit NFT to this address.</li>
-<li>Recharge through smart contracts is not supported. Do not recharge USDT through ERC20, Arbitrum and Optimism networks.</li>
-</ol>
-</div>
 
+  <!-- Your original deposit page markup should remain here.
+       If you replace your existing file, keep your original HTML structure and only replace the script logic below.
+       This version assumes your page has:
+         - Network buttons with class "network-button" and text: BEP20/TRC20/ERC20
+         - Address container with class "address-text" (or id="depositAddress")
+         - QR image element with id="qrImg"
+         - Caption element with class "qr-caption" (optional)
+  -->
+
+  <!-- Load your existing JS stack -->
   <script src="sb-config.js"></script>
-<script src="auth.js"></script>
-<script src="common-nav.js"></script>
+  <script src="auth.js"></script>
+  <script src="common-nav.js"></script>
+  <script src="sb-user.js"></script>
+  <script src="wallet.js"></script>
 
+  <script>
+  (function () {
+    // ---- CONFIG ----
+    var EDGE_FUNCTION = "nowpayments-create-payment";
+    var DEFAULT_AMOUNT_USD = 100; // change if you want (must be > 0)
 
-<script>
-  (function() {
-    var SUPABASE_URL = (window.SB_CONFIG && window.SB_CONFIG.url) ? window.SB_CONFIG.url : "";
-    var SUPABASE_ANON_KEY = (window.SB_CONFIG && window.SB_CONFIG.anonKey) ? window.SB_CONFIG.anonKey : "";
-    var EDGE_FUNCTION = (window.DEPOSIT_EDGE_FUNCTION || "generate-deposit-address");
-
-    var networkConfigs = {
-      "BEP20": { address: "" },
-      "TRC20": { address: "" },
-      "ERC20": { address: "" }
-    };
-    window.depositNetworkConfigs = networkConfigs;
-
-    var currentCurrency = "USDT";
-    var qrImgEl = document.getElementById("depositQr");
-    var addressTextEl = document.querySelector(".address-text");
-    var qrCaptionEl = document.querySelector(".qr-caption");
-    var networkButtons = Array.prototype.slice.call(document.querySelectorAll(".network-btn") || []);
-    var copyBtn = document.querySelector(".copy-btn");
-
-    function placeholderQrDataUri() {
-      var svg = ""
-        + "<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220' viewBox='0 0 220 220'>"
-        + "<rect width='220' height='220' fill='#fff'/>"
-        + "<rect x='10' y='10' width='200' height='200' rx='12' fill='none' stroke='#d9d9d9' stroke-width='2'/>"
-        + "<circle cx='110' cy='110' r='26' fill='#fff' stroke='#111' stroke-width='6'/>"
-        + "<circle cx='110' cy='110' r='10' fill='#111'/>"
-        + "</svg>";
-      return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
+    // ---- DOM HELPERS (non-breaking: tries multiple selectors) ----
+    function $(sel){ return document.querySelector(sel); }
+    function pickAddressEl(){
+      return $(".address-text") || $("#depositAddress") || $("#deposit_address") || null;
+    }
+    function pickQrImgEl(){
+      return $("#qrImg") || $(".qr img") || $("img.qr") || null;
+    }
+    function pickCaptionEl(){
+      return $(".qr-caption") || $("#qrCaption") || null;
     }
 
-    function updateQr(address) {
-      if (!qrImgEl) return;
-      var data = address ? String(address).trim() : "";
-      if (!data) {
-        qrImgEl.src = placeholderQrDataUri();
-        return;
-      }
-      var url = "https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=" + encodeURIComponent(data);
-      qrImgEl.src = url;
+    var addressTextEl = pickAddressEl();
+    var qrImgEl = pickQrImgEl();
+    var qrCaptionEl = pickCaptionEl();
+
+    function setText(el, txt){ if(el) el.textContent = txt; }
+    function setQr(addr){
+      if(!qrImgEl) return;
+      if(!addr){ qrImgEl.removeAttribute("src"); return; }
+      // QR as an image (no external libs)
+      var qrUrl = "https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=" + encodeURIComponent(addr);
+      qrImgEl.src = qrUrl;
+      qrImgEl.alt = "QR";
     }
 
-    function setActiveNetwork(network) {
-      networkButtons.forEach(function(b) {
-        var t = (b.textContent || "").trim().toUpperCase();
-        if (t === network) b.classList.add("active");
-        else b.classList.remove("active");
-      });
-      updateAddress(network);
-    }
-
-    function updateAddress(network) {
-      var cfg = networkConfigs[network];
-      if (!cfg || !addressTextEl || !qrCaptionEl) return;
-
-      var addr = (cfg.address || "").trim();
-      if (!addr) {
-        addressTextEl.textContent = "Loading...";
-        updateQr("");
-        if (network === "BEP20") {
-          qrCaptionEl.textContent = "Fetching " + network + " " + currentCurrency + " address...";
-        } else {
-          qrCaptionEl.textContent = "This network is not available yet.";
-        }
-        return;
-      }
-
-      addressTextEl.textContent = addr;
-      updateQr(addr);
-      qrCaptionEl.textContent = "This address only supports deposits of " + network + " " + currentCurrency;
-    }
-
-    async function getCurrentSupabaseUserId() {
+    function getCurrentSupabaseUserId() {
       try {
         if (window.ExaAuth && typeof window.ExaAuth.ensureSupabaseUserId === "function") {
-          var id = await window.ExaAuth.ensureSupabaseUserId();
-          return id ? String(id) : "";
-        }
-      } catch (e) {}
-      return "";
-    }
-
-    async function fetchDepositAddresses() {
-      if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-        return;
-      }
-      var userId = await getCurrentSupabaseUserId();
-      if (!userId) return;
-
-      var fnUrl = String(SUPABASE_URL).replace(/\/$/, "") + "/functions/v1/" + EDGE_FUNCTION;
-
-      var payload = {
-        user_id: userId,
-        currency: currentCurrency,
-        networks: ["BEP20", "TRC20", "ERC20"]
-      };
-
-      try {
-        var r = await fetch(fnUrl, {
-          method: "POST",
-          headers: {
-            "apikey": SUPABASE_ANON_KEY,
-            "Authorization": "Bearer " + SUPABASE_ANON_KEY,
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify(payload)
-        });
-
-        var data = null;
-        try { data = await r.json(); } catch (e) { data = null; }
-
-        if (!data) return;
-
-        var addrs = data.addresses || null;
-        if (!addrs && data.network && data.address) {
-          addrs = {};
-          addrs[String(data.network).toUpperCase()] = String(data.address);
-        }
-
-        if (addrs && typeof addrs === "object") {
-          Object.keys(addrs).forEach(function(k) {
-            var key = String(k).toUpperCase();
-            if (networkConfigs[key]) {
-              networkConfigs[key].address = String(addrs[k] || "");
-            }
+          return window.ExaAuth.ensureSupabaseUserId().then(function (id) {
+            return id ? String(id) : "";
           });
         }
-      } catch (e) {
-        // keep placeholder; avoid breaking UI
-        if (qrCaptionEl) qrCaptionEl.textContent = "Unable to fetch deposit address.";
-      }
-    }
-
-    if (copyBtn) {
-      copyBtn.addEventListener("click", function() {
-        var v = addressTextEl ? String(addressTextEl.textContent || "").trim() : "";
-        if (!v || v.toLowerCase() === "loading..." || v.toLowerCase() === "loading.") return;
-        if (navigator && navigator.clipboard && navigator.clipboard.writeText) {
-          navigator.clipboard.writeText(v).catch(function() {});
-        } else {
-          try {
-            var ta = document.createElement("textarea");
-            ta.value = v;
-            ta.style.position = "fixed";
-            ta.style.left = "-9999px";
-            document.body.appendChild(ta);
-            ta.focus();
-            ta.select();
-            document.execCommand("copy");
-            document.body.removeChild(ta);
-          } catch (e) {}
-        }
-      });
-    }
-
-    // Wire network buttons
-    networkButtons.forEach(function(btn) {
-      btn.addEventListener("click", function() {
-        var network = (btn.textContent || "").trim().toUpperCase();
-        if (!networkConfigs[network]) return;
-        setActiveNetwork(network);
-      });
-    });
-
-    // Init
-    updateQr("");
-    setActiveNetwork("BEP20");
-    fetchDepositAddresses().then(function() {
-      // refresh current view after load
-      var active = "BEP20";
-      networkButtons.forEach(function(b) {
-        if (b.classList.contains("active")) active = (b.textContent || "BEP20").trim().toUpperCase();
-      });
-      updateAddress(active);
-    });
-  })();
-</script>
-
-
-<script>
-  (function () {
-    if (!window.DemoWallet) return;
-
-    var POLL_INTERVAL_MS = 20000; // 20 seconds
-    var lastSeenKey = null;
-    var timerId = null;
-
-    function getCurrentCurrency() {
-      var currencyEl = document.querySelector(".currency-text");
-      return (currencyEl && currencyEl.textContent ? currencyEl.textContent.trim() : "USDT");
-    }
-
-    function getBep20Address() {
-      if (!window.depositNetworkConfigs || !window.depositNetworkConfigs.BEP20) return null;
-      return window.depositNetworkConfigs.BEP20.address || null;
-    }
-
-    function getLastSeenHashKey(address) {
-      return "last_seen_bep20_tx_" + address.toLowerCase();
-    }
-
-    function readLastSeenHash(address) {
-      try {
-        var k = getLastSeenHashKey(address);
-        return window.localStorage.getItem(k);
-      } catch (e) {
-        return null;
-      }
-    }
-
-    function writeLastSeenHash(address, hash) {
-      try {
-        var k = getLastSeenHashKey(address);
-        window.localStorage.setItem(k, hash);
       } catch (e) {}
+      return Promise.resolve("");
     }
 
-    function pollBep20Deposits() {
-      if (typeof BSC_SCAN_API_KEY === "undefined" || !BSC_SCAN_API_KEY || BSC_SCAN_API_KEY === "PUT_YOUR_BSCSCAN_API_KEY_HERE") {
-        return;
-      }
-      var addr = getBep20Address();
-      if (!addr) return;
-      var addrLower = addr.toLowerCase();
+    function buildFnUrl() {
+      // SB_CONFIG should expose projectUrl + anonKey (your sb-config.js already does this)
+      var url = (window.SB_CONFIG && window.SB_CONFIG.projectUrl) ? window.SB_CONFIG.projectUrl : "";
+      if (!url) return "";
+      return url.replace(/\/+$/, "") + "/functions/v1/" + EDGE_FUNCTION;
+    }
 
-      var url = "https://api.bscscan.com/api"
-        + "?module=account&action=tokentx"
-        + "&sort=desc"
-        + "&address=" + encodeURIComponent(addrLower)
-        + "&apikey=" + encodeURIComponent(BSC_SCAN_API_KEY);
+    async function fetchBep20Address() {
+      var userId = await getCurrentSupabaseUserId();
+      if (!userId) throw new Error("No user id (not logged in)");
 
-      fetch(url)
-        .then(function (r) { return r.json(); })
-        .then(function (data) {
-          if (!data || data.status !== "1" || !data.result || !data.result.length) {
-            return;
-          }
-          var tx = data.result[0];
-          if (!tx.to) return;
-          if (tx.to.toLowerCase() !== addrLower) return;
+      var fnUrl = buildFnUrl();
+      if (!fnUrl) throw new Error("Missing projectUrl in SB_CONFIG");
 
-          var lastSeen = readLastSeenHash(addrLower);
-          if (!lastSeen) {
-            // أول مرة نرى هذا العنوان، نخزن آخر معاملة ولا نضيف رصيد
-            writeLastSeenHash(addrLower, tx.hash);
-            return;
-          }
-          if (lastSeen === tx.hash) {
-            // لا يوجد إيداع جديد
-            return;
-          }
+      var anonKey = (window.SB_CONFIG && window.SB_CONFIG.anonKey) ? window.SB_CONFIG.anonKey : "";
+      if (!anonKey) throw new Error("Missing anonKey in SB_CONFIG");
 
-          // معاملة جديدة: نحسب المبلغ ونحدث الرصيد
-          writeLastSeenHash(addrLower, tx.hash);
-
-          var decimals = parseInt(tx.tokenDecimal || "18", 10);
-          var raw = tx.value || "0";
-          var amount = 0;
-          try {
-            var len = raw.length;
-            if (decimals >= len) {
-              var s = "0." + "0".repeat(decimals - len) + raw;
-              amount = parseFloat(s);
-            } else {
-              var intPart = raw.slice(0, len - decimals);
-              var fracPart = raw.slice(len - decimals);
-              var s2 = intPart + "." + fracPart;
-              amount = parseFloat(s2);
-            }
-          } catch (e) {
-            return;
-          }
-          if (!amount || !isFinite(amount) || amount <= 0) return;
-
-          var currency = getCurrentCurrency() || "USDT";
-
-          try {
-            // نضيف الرصيد محلياً في المحفظة
-            window.DemoWallet.recordDeposit(amount, currency);
-          } catch (e) {
-            if (console && console.error) console.error("recordDeposit error", e);
-          }
-
-          try {
-            // نسجل الإيداع أيضاً في Supabase باستخدام tx.hash
-            if (window.DemoWallet.submitDepositTx) {
-              window.DemoWallet.submitDepositTx(tx.hash, "BEP20", currency);
-            }
-          } catch (e) {
-            if (console && console.error) console.error("submitDepositTx error", e);
-          }
-
-          try {
-            alert("New BEP20 deposit detected: +" + amount + " " + currency);
-          } catch (e) {}
+      var res = await fetch(fnUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "apikey": anonKey,
+          "Authorization": "Bearer " + anonKey
+        },
+        body: JSON.stringify({
+          user_id: userId,
+          amount_usd: DEFAULT_AMOUNT_USD
         })
-        .catch(function (err) {
-          if (typeof console !== "undefined" && console && console.error) {
-            console.error("BEP20 auto poll error", err);
+      });
+
+      var data = await res.json().catch(function(){ return null; });
+      if (!res.ok) {
+        throw new Error((data && (data.error || data.details)) ? (data.error || data.details) : ("HTTP " + res.status));
+      }
+      var addr = (data && data.pay_address) ? String(data.pay_address) : "";
+      if (!addr) throw new Error("No pay_address returned");
+      return addr;
+    }
+
+    async function refresh() {
+      setText(addressTextEl, "Loading...");
+      setQr("");
+      setText(qrCaptionEl, "Fetching BEP20 USDT address...");
+      try {
+        // You said only BEP20 is active now
+        var addr = await fetchBep20Address();
+        setText(addressTextEl, addr);
+        setQr(addr);
+        setText(qrCaptionEl, "This address only supports deposits of BEP20 USDT");
+      } catch (e) {
+        console.error(e);
+        setText(addressTextEl, "Error");
+        setText(qrCaptionEl, String(e && e.message ? e.message : e));
+      }
+    }
+
+    // Disable other networks visually (no style changes, just prevents action)
+    function wireNetworkButtons() {
+      var btns = document.querySelectorAll(".network-button, .network-btn, .network-item");
+      btns.forEach(function(btn){
+        var t = (btn.textContent || "").trim().toUpperCase();
+        btn.addEventListener("click", function(){
+          if (t !== "BEP20") {
+            // keep UI, but do nothing
+            setText(qrCaptionEl, "Only BEP20 is enabled right now");
+            return;
           }
+          refresh();
         });
+      });
     }
 
-    function startPolling() {
-      if (timerId) return;
-      timerId = window.setInterval(pollBep20Deposits, POLL_INTERVAL_MS);
-      // أول مرة بعد ثانيتين
-      window.setTimeout(pollBep20Deposits, 2000);
-    }
+    wireNetworkButtons();
 
-    // نبدأ المراقبة تلقائياً عندما يفتح المستخدم صفحة الإيداع
-    startPolling();
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", refresh);
+    } else {
+      refresh();
+    }
   })();
-</script>
+  </script>
 </body>
 </html>
