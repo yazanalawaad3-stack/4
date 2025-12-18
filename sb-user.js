@@ -23,7 +23,7 @@
    */
   async function getCurrentProfile() {
     var userId = null;
-    try { userId = localStorage.getItem('currentUserId') || null; } catch (e) {}
+    try { userId = localStorage.getItem('currentUserId') || localStorage.getItem('sb_user_id_v1') || null; } catch (e) {}
     if (!userId) return null;
     var url = SB.url + '/rest/v1/users'
       + '?select=id,phone,invite_code,used_invite_code,public_id,created_at'
