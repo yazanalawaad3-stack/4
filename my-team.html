@@ -622,83 +622,65 @@
         var rows = await res.json();
         return Array.isArray(rows) ? rows : [];
       }
-      // ----------------------------
-      // Funding / Effective helpers
-      // ----------------------------
-      // IMPORTANT:
-      // - We DO NOT use wallet balance to decide "funded" because you give a signup bonus
-      //   which would make everyone look funded.
-      // - Instead we read the real deposit totals from `v_user_total_deposit`.
-      //
-      // Change this threshold if you want "any deposit" to count as funded.
-      var FUNDED_MIN_USDT = 100;
+
+
+      // --- Funded/effective helpers (real deposits) ---
+      var FUNDED_MIN_USDT = 100; // funded threshold in USDT (change only if your business rule changes)
 
       function uniq(arr) {
+        var seen = Object.create(null);
         var out = [];
-        var seen = {};
-        for (var i = 0; i < (arr || []).length; i++) {
-          var v = arr[i];
-          if (!v) continue;
-          var k = String(v);
-          if (seen[k]) continue;
-          seen[k] = true;
-          out.push(v);
-        }
+        (arr || []).forEach(function (x) {
+          if (!x) return;
+          if (seen[x]) return;
+          seen[x] = true;
+          out.push(x);
+        });
         return out;
       }
 
       async function fetchDepositTotalsByUserIds(userIds) {
-        userIds = uniq(userIds || []);
-        if (!userIds.length) return {};
-        // Supabase REST "in" filter is OK for moderate lists. Split if needed.
-        var chunks = [];
-        var CHUNK = 150;
-        for (var i = 0; i < userIds.length; i += CHUNK) chunks.push(userIds.slice(i, i + CHUNK));
+        var map = Object.create(null);
+        if (!userIds || !userIds.length) return map;
 
-        var map = {};
-        for (var c = 0; c < chunks.length; c++) {
-          var ids = chunks[c];
-          var url = "https://oyowsjjmaesspqiknvhp.supabase.co" + "/rest/v1/v_user_total_deposit"
-            + "?select=user_id,total_deposit"
-            + "&user_id=" + inFilter(ids)
-            + "&limit=1000";
-          var res = await fetch(url, { method: "GET", headers: apiHeaders() });
-          if (!res.ok) continue;
-          var rows = await res.json();
-          if (!Array.isArray(rows)) continue;
-          rows.forEach(function (r) {
-            if (!r || !r.user_id) return;
-            var n = 0;
-            try { n = Number(r.total_deposit); } catch (e) { n = 0; }
-            map[String(r.user_id)] = isFinite(n) ? n : 0;
-          });
-        }
+        // IMPORTANT: This may be blocked by RLS in your database. We handle failures safely.
+        var url = "https://oyowsjjmaesspqiknvhp.supabase.co" + "/rest/v1/v_user_total_deposit"
+          + "?select=user_id,total_deposit"
+          + "&user_id=" + inFilter(userIds)
+          + "&limit=1000";
+
+        var res = await fetch(url, { method: "GET", headers: apiHeaders() });
+        if (!res.ok) return map;
+
+        var rows = await res.json();
+        if (!Array.isArray(rows)) return map;
+
+        rows.forEach(function (r) {
+          if (!r || !r.user_id) return;
+          map[r.user_id] = Number(r.total_deposit || 0);
+        });
         return map;
       }
 
-      function countFunded(ids, depositMap) {
-        var n = 0;
-        (ids || []).forEach(function (id) {
-          if (!id) return;
-          var v = depositMap && depositMap[String(id)] != null ? Number(depositMap[String(id)]) : 0;
-          if (!isFinite(v)) v = 0;
-          if (v >= FUNDED_MIN_USDT) n++;
+      function countFunded(userIds, depositMap) {
+        var c = 0;
+        (userIds || []).forEach(function (id) {
+          var dep = depositMap && depositMap[id] != null ? Number(depositMap[id]) : 0;
+          if (dep >= FUNDED_MIN_USDT) c++;
         });
-        return n;
+        return c;
       }
-
 
       function setText(el, text) {
         if (!el) return;
         el.textContent = text;
       }
 
-      function renderSummary(effectiveAll, totalAll) {
+            function renderSummary(effectiveAll, totalAll) {
         var summaryValues = document.querySelectorAll('.summary-box .summary-value');
         if (summaryValues.length >= 1) {
           setText(summaryValues[0], String(effectiveAll) + "/" + String(totalAll));
         }
-      }
       }
 
       function renderGen(cardIdx, effectiveCount, genTotal, percent) {
@@ -712,9 +694,7 @@
         spans[0].textContent = String(effectiveCount) + "/" + String(genTotal);
         spans[1].textContent = String(percent) + "%";
         spans[2].textContent = "0/0";
-      }
-
-      function renderGen1Table(gen1) {
+      }function renderGen1Table(gen1) {
         var tbody = document.querySelector('.team-table tbody');
         if (!tbody) return;
         while (tbody.firstChild) tbody.removeChild(tbody.firstChild);
@@ -739,7 +719,7 @@
         });
       }
 
-      async function loadTeam() {
+            async function loadTeam() {
         try {
           if (!window.SBUser || typeof window.SBUser.getCurrentProfile !== "function") return;
           var profile = await window.SBUser.getCurrentProfile();
@@ -747,6 +727,7 @@
 
           var myId = profile.id;
 
+          // Build generations (this is how your page worked before; keep it the same)
           var gen1 = await fetchUsersByInviterIds([myId]);
           var gen1Ids = gen1.map(function (u) { return u.id; }).filter(Boolean);
 
@@ -754,23 +735,34 @@
           var gen2Ids = gen2.map(function (u) { return u.id; }).filter(Boolean);
 
           var gen3 = gen2Ids.length ? await fetchUsersByInviterIds(gen2Ids) : [];
+          var gen3Ids = gen3.map(function (u) { return u.id; }).filter(Boolean);
 
           var totalAll = gen1.length + gen2.length + gen3.length;
 
-          // Compute "effective / funded" counts based on real deposits.
-          var allTeamIds = uniq(gen1Ids.concat(gen2Ids).concat(gen3.map(function (u) { return u.id; }).filter(Boolean)));
-          var depositMap = await fetchDepositTotalsByUserIds(allTeamIds);
-
-          var fundedGen1 = countFunded(gen1Ids, depositMap);
-          var fundedGen2 = countFunded(gen2Ids, depositMap);
-          var fundedGen3 = countFunded(gen3.map(function (u) { return u.id; }).filter(Boolean), depositMap);
-          var effectiveAll = fundedGen1 + fundedGen2 + fundedGen3;
-
-          renderSummary(effectiveAll, totalAll);
-          renderGen(0, fundedGen1, gen1.length, 20);
-          renderGen(1, fundedGen2, gen2.length, 5);
-          renderGen(2, fundedGen3, gen3.length, 3);
+          // Always render totals + list even if funded query fails (prevents 0/0 + blank page)
+          renderSummary(0, totalAll);
+          renderGen(0, 0, gen1.length, 20);
+          renderGen(1, 0, gen2.length, 5);
+          renderGen(2, 0, gen3.length, 3);
           renderGen1Table(gen1);
+
+          // Now try to compute funded counts (real deposits)
+          try {
+            var allTeamIds = uniq(gen1Ids.concat(gen2Ids).concat(gen3Ids));
+            var depositMap = await fetchDepositTotalsByUserIds(allTeamIds);
+
+            var fundedGen1 = countFunded(gen1Ids, depositMap);
+            var fundedGen2 = countFunded(gen2Ids, depositMap);
+            var fundedGen3 = countFunded(gen3Ids, depositMap);
+            var effectiveAll = fundedGen1 + fundedGen2 + fundedGen3;
+
+            renderSummary(effectiveAll, totalAll);
+            renderGen(0, fundedGen1, gen1.length, 20);
+            renderGen(1, fundedGen2, gen2.length, 5);
+            renderGen(2, fundedGen3, gen3.length, 3);
+          } catch (e2) {
+            try { console.warn("Funded counts unavailable (likely RLS on v_user_total_deposit). Showing 0 funded.", e2); } catch (_) {}
+          }
         } catch (e) {
           try { console.error(e); } catch (_) {}
         }
